@@ -1,0 +1,65 @@
+# Blender 3.5.0 MTL File: 'None'
+# www.blender.org
+
+newmtl glass
+Ns 1000.000000
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 0.315430
+illum 6
+
+newmtl hallway
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd flat_textures/hallway_baseColor.png
+map_Ke flat_textures/hallway_emissive.png
+
+newmtl kitchen
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd flat_textures/kitchen_baseColor.png
+map_Ke flat_textures/kitchen_emissive.png
+
+newmtl living_room
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd flat_textures/living_room_baseColor.png
+map_Bump -bm 1.000000 flat_textures/living_room_normal.png
+
+newmtl plants
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd flat_textures/plants_baseColor.png
+map_Bump -bm 1.000000 flat_textures/plants_normal.png
+
+newmtl walls
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd flat_textures/walls_baseColor.png
+map_Bump -bm 1.000000 flat_textures/walls_normal.png
