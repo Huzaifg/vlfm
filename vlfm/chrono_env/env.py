@@ -16,7 +16,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
 class ChronoEnv:
-    def __init__(self):
+    def __init__(self, target_object: str = "tv"):
         self.my_system = None
 
         # Output directory
@@ -55,6 +55,7 @@ class ChronoEnv:
         self.step_number = 0
         self.render_frame = 0
         self.observations = None
+        self.target_object = target_object  # Target object
 
     def reset(self):
         self.my_system = chrono.ChSystemSMC()
@@ -190,10 +191,10 @@ class ChronoEnv:
 
         self.observations = self._get_observations()
 
-        self.stop = self.get_stop()
+        self.stop = self._get_stop()
         return self.observations, self.stop
 
-    def get_stop(self):
+    def _get_stop(self):
         return False
 
     def _get_observations(self):
@@ -226,7 +227,8 @@ class ChronoEnv:
             "rgb": camera_data,
             "depth": depth_data,
             "gps": torch.stack((robot_x, robot_y)),
-            "compass": robot_yaw
+            "compass": robot_yaw,
+            "objectgoal": self.target_object  # Target object
         }
 
         return obs_dict
