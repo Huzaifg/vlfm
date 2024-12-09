@@ -14,6 +14,7 @@ sys.path.append(project_root)
 # Add the parent directory of 'models' to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+import vlfm.policy.chrono_policies
 
 class ChronoEnv:
     def __init__(self, target_object: str = "tv"):
@@ -238,10 +239,66 @@ if __name__ == "__main__":
     env = ChronoEnv()
     env.reset()
 
+
+
+
+    ### VLFM
+
+    # sensor params
+    camera_height = 0.88
+    min_depth = 0.5
+    max_depth = 5.0
+    camera_fov = 79
+    image_width = 640
+
+    # kwargs for itm policy
+    # name = "ChronoITMPolicy"
+    text_prompt = "Seems like there is a target_object ahead."
+    use_max_confidence = False
+    pointnav_policy_path = "data/pointnav_weights.pth"
+    depth_image_shape = (224, 224)
+    pointnav_stop_radius = 0.9
+    object_map_erosion_size = 5
+    exploration_thresh = 0.0
+    obstacle_map_area_threshold = 1.5  # in square meters
+    min_obstacle_height = 0.61
+    max_obstacle_height = 0.88
+    hole_area_thresh = 100000
+    use_vqa = False
+    vqa_prompt = "Is this "
+    coco_threshold = 0.8
+    non_coco_threshold = 0.4
+    agent_radius = 0.18
+
+
+    vlfm_policy = vlfm.policy.chrono_policies.ChronoITMPolicy(
+        camera_height=camera_height,
+        min_depth=min_depth,
+        max_depth=max_depth,
+        camera_fov=camera_fov,
+        image_width=image_width,
+        text_prompt=text_prompt,
+        use_max_confidence=use_max_confidence,
+        pointnav_policy_path=pointnav_policy_path,
+        depth_image_shape=depth_image_shape,
+        pointnav_stop_radius=pointnav_stop_radius,
+        object_map_erosion_size=object_map_erosion_size,
+        obstacle_map_area_threshold=obstacle_map_area_threshold,
+        min_obstacle_height=min_obstacle_height,
+        max_obstacle_height=max_obstacle_height,
+        hole_area_thresh=hole_area_thresh,
+        use_vqa=use_vqa,
+        vqa_prompt=vqa_prompt,
+        coco_threshold=coco_threshold,
+        non_coco_threshold=non_coco_threshold,
+        agent_radius=agent_radius
+    )
+
     end_time = 10
     control_timestep = 0.01
     time = 0
     while time < end_time:
         obs, stop = env.step(0)
         print(obs)
+
         time += control_timestep

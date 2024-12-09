@@ -67,10 +67,12 @@ class BaseObjectNavPolicy(BasePolicy):
         self._use_vqa = use_vqa
         if use_vqa:
             self._vqa = BLIP2Client(port=int(os.environ.get("BLIP2_PORT", "12185")))
-        self._pointnav_policy = WrappedPointNavResNetPolicy(pointnav_policy_path)
+        # self._pointnav_policy = WrappedPointNavResNetPolicy(pointnav_policy_path)
         self._object_map: ObjectPointCloudMap = ObjectPointCloudMap(erosion_size=object_map_erosion_size)
+        print("depth_image_shape", depth_image_shape)
+        print("depth_image_shape_type", type(depth_image_shape))
         self._depth_image_shape = tuple(depth_image_shape)
-        self._pointnav_stop_radius = pointnav_stop_radius
+        # self._pointnav_stop_radius = pointnav_stop_radius
         self._visualize = visualize
         self._vqa_prompt = vqa_prompt
         self._coco_threshold = coco_threshold
@@ -93,7 +95,7 @@ class BaseObjectNavPolicy(BasePolicy):
 
     def _reset(self) -> None:
         self._target_object = ""
-        self._pointnav_policy.reset()
+        # self._pointnav_policy.reset()
         self._object_map.reset()
         self._last_goal = np.zeros(2)
         self._num_steps = 0
@@ -135,7 +137,7 @@ class BaseObjectNavPolicy(BasePolicy):
             pointnav_action = self._explore(observations)
         else:
             mode = "navigate"
-            pointnav_action = self._pointnav(goal[:2], stop=True)
+            # pointnav_action = self._pointnav(goal[:2], stop=True)
 
         action_numpy = pointnav_action.detach().cpu().numpy()[0]
         if len(action_numpy) == 1:
@@ -240,43 +242,43 @@ class BaseObjectNavPolicy(BasePolicy):
 
         return detections
 
-    def _pointnav(self, goal: np.ndarray, stop: bool = False) -> Tensor:
-        """
-        Calculates rho and theta from the robot's current position to the goal using the
-        gps and heading sensors within the observations and the given goal, then uses
-        it to determine the next action to take using the pre-trained pointnav policy.
+    # def _pointnav(self, goal: np.ndarray, stop: bool = False) -> Tensor:
+    #     """
+    #     Calculates rho and theta from the robot's current position to the goal using the
+    #     gps and heading sensors within the observations and the given goal, then uses
+    #     it to determine the next action to take using the pre-trained pointnav policy.
 
-        Args:
-            goal (np.ndarray): The goal to navigate to as (x, y), where x and y are in
-                meters.
-            stop (bool): Whether to stop if we are close enough to the goal.
+    #     Args:
+    #         goal (np.ndarray): The goal to navigate to as (x, y), where x and y are in
+    #             meters.
+    #         stop (bool): Whether to stop if we are close enough to the goal.
 
-        """
-        masks = torch.tensor([self._num_steps != 0], dtype=torch.bool, device="cuda")
-        if not np.array_equal(goal, self._last_goal):
-            if np.linalg.norm(goal - self._last_goal) > 0.1:
-                self._pointnav_policy.reset()
-                masks = torch.zeros_like(masks)
-            self._last_goal = goal
-        robot_xy = self._observations_cache["robot_xy"]
-        heading = self._observations_cache["robot_heading"]
-        rho, theta = rho_theta(robot_xy, heading, goal)
-        rho_theta_tensor = torch.tensor([[rho, theta]], device="cuda", dtype=torch.float32)
-        obs_pointnav = {
-            "depth": image_resize(
-                self._observations_cache["nav_depth"],
-                (self._depth_image_shape[0], self._depth_image_shape[1]),
-                channels_last=True,
-                interpolation_mode="area",
-            ),
-            "pointgoal_with_gps_compass": rho_theta_tensor,
-        }
-        self._policy_info["rho_theta"] = np.array([rho, theta])
-        if rho < self._pointnav_stop_radius and stop:
-            self._called_stop = True
-            return self._stop_action
-        action = self._pointnav_policy.act(obs_pointnav, masks, deterministic=True)
-        return action
+    #     """
+    #     masks = torch.tensor([self._num_steps != 0], dtype=torch.bool, device="cuda")
+    #     if not np.array_equal(goal, self._last_goal):
+    #         if np.linalg.norm(goal - self._last_goal) > 0.1:
+    #             self._pointnav_policy.reset()
+    #             masks = torch.zeros_like(masks)
+    #         self._last_goal = goal
+    #     robot_xy = self._observations_cache["robot_xy"]
+    #     heading = self._observations_cache["robot_heading"]
+    #     rho, theta = rho_theta(robot_xy, heading, goal)
+    #     rho_theta_tensor = torch.tensor([[rho, theta]], device="cuda", dtype=torch.float32)
+    #     obs_pointnav = {
+    #         "depth": image_resize(
+    #             self._observations_cache["nav_depth"],
+    #             (self._depth_image_shape[0], self._depth_image_shape[1]),
+    #             channels_last=True,
+    #             interpolation_mode="area",
+    #         ),
+    #         "pointgoal_with_gps_compass": rho_theta_tensor,
+    #     }
+    #     self._policy_info["rho_theta"] = np.array([rho, theta])
+    #     if rho < self._pointnav_stop_radius and stop:
+    #         self._called_stop = True
+    #         return self._stop_action
+    #     action = self._pointnav_policy.act(obs_pointnav, masks, deterministic=True)
+    #     return action
 
     def _update_object_map(
         self,
