@@ -34,7 +34,7 @@ class ChronoMixin:
     _compute_frontiers: bool = True
     _visualize: bool = True
 
-    def __init__(self, camera_height: float, min_depth: float, max_depth: float, camera_fov: float, image_width: int, *args: Any, **kwargs: Any) -> None:      
+    def __init__(self, camera_height: float, min_depth: float, max_depth: float, camera_fov: float, image_width: int, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._camera_height = camera_height
         self._min_depth = min_depth
@@ -48,7 +48,7 @@ class ChronoMixin:
 
         try:
             action, rnn_hidden_states = parent_cls.act(
-                observations.to_tree(), rnn_hidden_states, prev_actions, masks, deterministic)
+                observations, rnn_hidden_states, prev_actions, masks, deterministic)
         except StopIteration:
             action = self._stop_action
 
@@ -85,14 +85,13 @@ class ChronoMixin:
         """
         if len(self._observations_cache) > 0:
             return
-        rgb = observations["rgb"][0].cpu().numpy()
-        depth = observations["depth"][0].cpu().numpy()
-        x, y = observations["gps"][0].cpu().numpy()
-        camera_yaw = observations["compass"][0].cpu().item()
+        rgb = observations["rgb"].cpu().numpy()
+        depth = observations["depth"].cpu().numpy()
+        x, y = observations["gps"].cpu().numpy()
+        camera_yaw = observations["compass"].cpu().item()
 
         # Print shape of all of above
         depth = filter_depth(depth.reshape(depth.shape[:2]), blur_type=None)
-        # Habitat GPS makes west negative, so flip y
         camera_position = np.array([x, y, self._camera_height])
         robot_xy = camera_position[:2]
         tf_camera_to_episodic = xyz_yaw_to_tf_matrix(
@@ -143,7 +142,7 @@ class ChronoMixin:
                     self._camera_fov,
                 )
             ],
-            "habitat_start_yaw": observations["heading"][0].item(),
+            "habitat_start_yaw": observations["compass"].item(),
         }
 
 # @baseline_registry.register_policy
@@ -185,9 +184,6 @@ class ChronoITMPolicyV3(ChronoMixin, ITMPolicyV3):
 # @dataclass
 # class VLFMPolicyConfig(VLFMConfig, PolicyConfig):
 #     pass
-
-
-
 
     # def _explore(self, observations: TensorDict) -> Tensor:
     #     frontiers = self._observations_cache["frontier_sensor"]

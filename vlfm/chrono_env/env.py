@@ -1,3 +1,4 @@
+import vlfm.policy.chrono_policies
 import math
 import numpy as np
 import pychrono.sensor as sens
@@ -14,10 +15,9 @@ sys.path.append(project_root)
 # Add the parent directory of 'models' to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-import vlfm.policy.chrono_policies
 
 class ChronoEnv:
-    def __init__(self, target_object: str = "tv"):
+    def __init__(self, target_object: str = "chair"):
         self.my_system = None
 
         # Output directory
@@ -239,16 +239,11 @@ if __name__ == "__main__":
     env = ChronoEnv()
     env.reset()
 
-
-
-
-    ### VLFM
-
     # sensor params
-    camera_height = 0.88
-    min_depth = 0.5
+    camera_height = 0.0
+    min_depth = 0.1
     max_depth = 5.0
-    camera_fov = 79
+    camera_fov = 80.67
     image_width = 640
 
     # kwargs for itm policy
@@ -256,20 +251,19 @@ if __name__ == "__main__":
     text_prompt = "Seems like there is a target_object ahead."
     use_max_confidence = False
     pointnav_policy_path = "data/pointnav_weights.pth"
-    depth_image_shape = (224, 224)
+    depth_image_shape = (480, 640)
     pointnav_stop_radius = 0.9
     object_map_erosion_size = 5
     exploration_thresh = 0.0
     obstacle_map_area_threshold = 1.5  # in square meters
-    min_obstacle_height = 0.61
-    max_obstacle_height = 0.88
+    min_obstacle_height = 0.1
+    max_obstacle_height = 0.4
     hole_area_thresh = 100000
     use_vqa = False
     vqa_prompt = "Is this "
     coco_threshold = 0.8
     non_coco_threshold = 0.4
     agent_radius = 0.18
-
 
     vlfm_policy = vlfm.policy.chrono_policies.ChronoITMPolicy(
         camera_height=camera_height,
@@ -299,6 +293,13 @@ if __name__ == "__main__":
     time = 0
     while time < end_time:
         obs, stop = env.step(0)
-        print(obs)
+        if time == 0:
+            masks = torch.zeros(1, 1)
+        else:
+            masks = torch.ones(1, 1)
+
+        action, _ = vlfm_policy.act(obs, None, None, masks)
+        print("Here")
+        print(action)
 
         time += control_timestep
