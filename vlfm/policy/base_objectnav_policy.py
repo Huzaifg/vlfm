@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from hydra.core.config_store import ConfigStore
 from torch import Tensor
-
+import time
 from vlfm.mapping.object_point_cloud_map import ObjectPointCloudMap
 from vlfm.mapping.obstacle_map import ObstacleMap
 from vlfm.obs_transformers.utils import image_resize
@@ -34,7 +34,8 @@ except Exception:
 class BaseObjectNavPolicy(BasePolicy):
     _target_object: str = ""
     _policy_info: Dict[str, Any] = {}
-    _object_masks: Union[np.ndarray, Any] = None  # set by ._update_object_map()
+    # set by ._update_object_map()
+    _object_masks: Union[np.ndarray, Any] = None
     _stop_action: Union[Tensor, Any] = None  # MUST BE SET BY SUBCLASS
     _observations_cache: Dict[str, Any] = {}
     _non_coco_caption = ""
@@ -61,14 +62,19 @@ class BaseObjectNavPolicy(BasePolicy):
         **kwargs: Any,
     ) -> None:
         super().__init__()
-        self._object_detector = GroundingDINOClient(port=int(os.environ.get("GROUNDING_DINO_PORT", "12181")))
-        self._coco_object_detector = YOLOv7Client(port=int(os.environ.get("YOLOV7_PORT", "12184")))
-        self._mobile_sam = MobileSAMClient(port=int(os.environ.get("SAM_PORT", "12183")))
+        self._object_detector = GroundingDINOClient(
+            port=int(os.environ.get("GROUNDING_DINO_PORT", "12181")))
+        self._coco_object_detector = YOLOv7Client(
+            port=int(os.environ.get("YOLOV7_PORT", "12184")))
+        self._mobile_sam = MobileSAMClient(
+            port=int(os.environ.get("SAM_PORT", "12183")))
         self._use_vqa = use_vqa
         if use_vqa:
-            self._vqa = BLIP2Client(port=int(os.environ.get("BLIP2_PORT", "12185")))
+            self._vqa = BLIP2Client(
+                port=int(os.environ.get("BLIP2_PORT", "12185")))
         # self._pointnav_policy = WrappedPointNavResNetPolicy(pointnav_policy_path)
-        self._object_map: ObjectPointCloudMap = ObjectPointCloudMap(erosion_size=object_map_erosion_size)
+        self._object_map: ObjectPointCloudMap = ObjectPointCloudMap(
+            erosion_size=object_map_erosion_size)
         print("depth_image_shape", depth_image_shape)
         print("depth_image_shape_type", type(depth_image_shape))
         self._depth_image_shape = tuple(depth_image_shape)
@@ -123,7 +129,8 @@ class BaseObjectNavPolicy(BasePolicy):
 
         object_map_rgbd = self._observations_cache["object_map_rgbd"]
         detections = [
-            self._update_object_map(rgb, depth, tf, min_depth, max_depth, fx, fy)
+            self._update_object_map(
+                rgb, depth, tf, min_depth, max_depth, fx, fy)
             for (rgb, depth, tf, min_depth, max_depth, fx, fy) in object_map_rgbd
         ]
         robot_xy = self._observations_cache["robot_xy"]
@@ -142,7 +149,8 @@ class BaseObjectNavPolicy(BasePolicy):
         action_numpy = pointnav_action.detach().cpu().numpy()[0]
         if len(action_numpy) == 1:
             action_numpy = action_numpy[0]
-        print(f"Step: {self._num_steps} | Mode: {mode} | Action: {action_numpy}")
+        print(
+            f"Step: {self._num_steps} | Mode: {mode} | Action: {action_numpy}")
         self._policy_info.update(self._get_policy_info(detections[0]))
         self._num_steps += 1
 
@@ -178,7 +186,8 @@ class BaseObjectNavPolicy(BasePolicy):
 
     def _get_policy_info(self, detections: ObjectDetections) -> Dict[str, Any]:
         if self._object_map.has_object(self._target_object):
-            target_point_cloud = self._object_map.get_target_cloud(self._target_object)
+            target_point_cloud = self._object_map.get_target_cloud(
+                self._target_object)
         else:
             target_point_cloud = np.array([])
         policy_info = {
@@ -199,20 +208,45 @@ class BaseObjectNavPolicy(BasePolicy):
             return policy_info
 
         annotated_depth = self._observations_cache["object_map_rgbd"][0][1] * 255
-        annotated_depth = cv2.cvtColor(annotated_depth.astype(np.uint8), cv2.COLOR_GRAY2RGB)
+        annotated_depth = cv2.cvtColor(
+            annotated_depth.astype(np.uint8), cv2.COLOR_GRAY2RGB)
         if self._object_masks.sum() > 0:
             # If self._object_masks isn't all zero, get the object segmentations and
             # draw them on the rgb and depth images
-            contours, _ = cv2.findContours(self._object_masks, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-            annotated_rgb = cv2.drawContours(detections.annotated_frame, contours, -1, (255, 0, 0), 2)
-            annotated_depth = cv2.drawContours(annotated_depth, contours, -1, (255, 0, 0), 2)
+            contours, _ = cv2.findContours(
+                self._object_masks, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            annotated_rgb = cv2.drawContours(
+                detections.annotated_frame, contours, -1, (255, 0, 0), 2)
+            annotated_depth = cv2.drawContours(
+                annotated_depth, contours, -1, (255, 0, 0), 2)
         else:
             annotated_rgb = self._observations_cache["object_map_rgbd"][0][0]
         policy_info["annotated_rgb"] = annotated_rgb
         policy_info["annotated_depth"] = annotated_depth
 
+        # Visualize the depth map
+        import matplotlib.pyplot as plt
+        plt.figure(figsize=(10, 5))
+        plt.subplot(1, 2, 1)
+        plt.title("Annotated Depth")
+        plt.imshow(annotated_depth)
+        plt.axis('off')
+
         if self._compute_frontiers:
-            policy_info["obstacle_map"] = cv2.cvtColor(self._obstacle_map.visualize(), cv2.COLOR_BGR2RGB)
+            obstacle_map_rgb = cv2.cvtColor(
+                self._obstacle_map.visualize(), cv2.COLOR_BGR2RGB)
+            policy_info["obstacle_map"] = obstacle_map_rgb
+
+            # Visualize the frontier map
+            plt.subplot(1, 2, 2)
+            plt.title("Obstacle Map")
+            plt.imshow(obstacle_map_rgb)
+            plt.axis('off')
+
+        # Save the figure to a file with a unique name
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        # plt.savefig(f"policy_info_visualization_{timestamp}.png")
+        plt.close()
 
         if "DEBUG_INFO" in os.environ:
             policy_info["render_below_images"].append("debug")
@@ -222,7 +256,8 @@ class BaseObjectNavPolicy(BasePolicy):
 
     def _get_object_detections(self, img: np.ndarray) -> ObjectDetections:
         target_classes = self._target_object.split("|")
-        has_coco = any(c in COCO_CLASSES for c in target_classes) and self._load_yolo
+        has_coco = any(
+            c in COCO_CLASSES for c in target_classes) and self._load_yolo
         has_non_coco = any(c not in COCO_CLASSES for c in target_classes)
 
         detections = (
@@ -236,7 +271,8 @@ class BaseObjectNavPolicy(BasePolicy):
 
         if has_coco and has_non_coco and detections.num_detections == 0:
             # Retry with non-coco object detector
-            detections = self._object_detector.predict(img, caption=self._non_coco_caption)
+            detections = self._object_detector.predict(
+                img, caption=self._non_coco_caption)
             detections.filter_by_class(target_classes)
             detections.filter_by_conf(self._non_coco_threshold)
 
@@ -319,15 +355,19 @@ class BaseObjectNavPolicy(BasePolicy):
             obs[1] = depth
             self._observations_cache["object_map_rgbd"][0] = tuple(obs)
         for idx in range(len(detections.logits)):
-            bbox_denorm = detections.boxes[idx] * np.array([width, height, width, height])
-            object_mask = self._mobile_sam.segment_bbox(rgb, bbox_denorm.tolist())
+            bbox_denorm = detections.boxes[idx] * \
+                np.array([width, height, width, height])
+            object_mask = self._mobile_sam.segment_bbox(
+                rgb, bbox_denorm.tolist())
 
             # If we are using vqa, then use the BLIP2 model to visually confirm whether
             # the contours are actually correct.
 
             if self._use_vqa:
-                contours, _ = cv2.findContours(object_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-                annotated_rgb = cv2.drawContours(rgb.copy(), contours, -1, (255, 0, 0), 2)
+                contours, _ = cv2.findContours(
+                    object_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                annotated_rgb = cv2.drawContours(
+                    rgb.copy(), contours, -1, (255, 0, 0), 2)
                 question = f"Question: {self._vqa_prompt}"
                 if not detections.phrases[idx].endswith("ing"):
                     question += "a "
@@ -349,7 +389,8 @@ class BaseObjectNavPolicy(BasePolicy):
             )
 
         cone_fov = get_fov(fx, depth.shape[1])
-        self._object_map.update_explored(tf_camera_to_episodic, max_depth, cone_fov)
+        self._object_map.update_explored(
+            tf_camera_to_episodic, max_depth, cone_fov)
 
         return detections
 

@@ -57,6 +57,7 @@ class ChronoEnv:
         self.render_frame = 0
         self.observations = None
         self.target_object = target_object  # Target object
+        self.virtual_robot = None
 
     def reset(self):
         self.my_system = chrono.ChSystemSMC()
@@ -64,6 +65,7 @@ class ChronoEnv:
             chrono.ChCollisionSystem.Type_BULLET)
 
         patch_mat = chrono.ChContactMaterialSMC()
+
         # patch_mat.SetFriction(0.1)
         # patch_mat.SetRollingFriction(0.001)
         # terrain = veh.RigidTerrain(my_system)
@@ -72,7 +74,11 @@ class ChronoEnv:
         #     100, 100)
         # patch.SetColor(chrono.ChColor(0.0, 0.0, 0.0))
         # terrain.Initialize()
-
+        self.virtual_robot = chrono.ChBodyEasyBox(
+            0.5, 0.5, 0.5, 100, True, True, patch_mat)
+        self.virtual_robot.SetPos(chrono.ChVector3d(0, 0.25, 0))
+        self.virtual_robot.SetFixed(True)
+        self.my_system.Add(self.virtual_robot)
         mmesh = chrono.ChTriangleMeshConnected()
         mmesh.LoadWavefrontMesh(
             project_root + '/data/chrono_environment/flat_env.obj', False, True)
@@ -105,20 +111,11 @@ class ChronoEnv:
         self.manager.scene.AddAreaLight(chrono.ChVector3f(0, 0, 4), chrono.ChColor(
             intensity, intensity, intensity), 500.0, chrono.ChVector3f(1, 0, 0), chrono.ChVector3f(0, -1, 0))
 
-        rotation_1 = chrono.QuatFromAngleAxis(
-            np.pi/2, chrono.ChVector3d(0, 0, 1))
-        rotation_2 = chrono.QuatFromAngleAxis(
-            np.pi/2, chrono.ChVector3d(0, 1, 0))
-        rotation_3 = chrono.QuatFromAngleAxis(
-            np.pi/2, chrono.ChVector3d(0, 0, 1))
-
-        rotation_quat = rotation_1 * rotation_2 * rotation_3
-
         offset_pose = chrono.ChFramed(
-            chrono.ChVector3d(0, 1, 0), rotation_quat)
+            chrono.ChVector3d(0, 0.5, 0), chrono.Q_ROTATE_Z_TO_Y)
 
         self.lidar = sens.ChLidarSensor(
-            mesh_body,             # body lidar is attached to
+            self.virtual_robot,             # body lidar is attached to
             20,                     # scanning rate in Hz
             offset_pose,            # offset pose
             self.image_width,                   # number of horizontal samples
@@ -142,7 +139,7 @@ class ChronoEnv:
         self.manager.AddSensor(self.lidar)
 
         self.cam = sens.ChCameraSensor(
-            mesh_body,              # body camera is attached to
+            self.virtual_robot,              # body camera is attached to
             self.update_rate,            # update rate in Hz
             offset_pose,            # offset pose
             self.image_width,            # image width
@@ -181,6 +178,7 @@ class ChronoEnv:
         return self.observations
 
     def step(self, action):
+        self._do_action(action, self.virtual_robot)
         for i in range(0, self.steps_per_control):
             self.manager.Update()
             sim_time = self.my_system.GetChTime()
@@ -234,10 +232,26 @@ class ChronoEnv:
 
         return obs_dict
 
+    def _do_action(self, action, robot):
+        # Convert action tensor to integer
+        action_id = action.item()
+
+        if action_id == 1:  # MOVE_FORWARD
+            robot.SetPos(robot.GetPos() + chrono.ChVector3d(
+                0.01 * np.sin(robot.GetRot().GetCardanAnglesXYZ().y + np.pi/2),
+                0,
+                0.01 * np.cos(robot.GetRot().GetCardanAnglesXYZ().y + np.pi/2)
+            ))
+        elif action_id == 2:  # TURN_LEFT
+            robot.SetRot(chrono.QuatFromAngleY(np.pi/6)*robot.GetRot())
+
+        elif action_id == 3:  # TURN_RIGHT
+            robot.SetRot(chrono.QuatFromAngleY(-np.pi/6)*robot.GetRot())
+
 
 if __name__ == "__main__":
     env = ChronoEnv()
-    env.reset()
+    obs = env.reset()
 
     # sensor params
     camera_height = 0.0
@@ -252,7 +266,7 @@ if __name__ == "__main__":
     use_max_confidence = False
     pointnav_policy_path = "data/pointnav_weights.pth"
     depth_image_shape = (480, 640)
-    pointnav_stop_radius = 0.9
+    pointnav_stop_radius = 0.01
     object_map_erosion_size = 5
     exploration_thresh = 0.0
     obstacle_map_area_threshold = 1.5  # in square meters
@@ -289,17 +303,14 @@ if __name__ == "__main__":
     )
 
     end_time = 10
-    control_timestep = 0.01
+    control_timestep = 0.1
     time = 0
+    masks = torch.zeros(1, 1)
     while time < end_time:
-        obs, stop = env.step(0)
-        if time == 0:
-            masks = torch.zeros(1, 1)
-        else:
-            masks = torch.ones(1, 1)
-
         action, _ = vlfm_policy.act(obs, None, None, masks)
-        print("Here")
-        print(action)
+        masks = torch.ones(1, 1)
+        obs, stop = env.step(action)
+        # obs, stop = env.step(torch.tensor(0))
+        print(vlfm_policy._policy_info)
 
         time += control_timestep
