@@ -1,3 +1,4 @@
+import time
 import vlfm.policy.chrono_policies
 import math
 import numpy as np
@@ -14,7 +15,7 @@ project_root = os.path.abspath(os.path.join(current_dir, '../../'))
 sys.path.append(project_root)
 # Add the parent directory of 'models' to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import time
+
 
 class ChronoEnv:
     def __init__(self, target_object: str = "bed"):
@@ -202,17 +203,20 @@ class ChronoEnv:
             depth_data = depth_buffer.GetDIData()
             # Removes the 2nd column which is intensity
             depth_data = torch.tensor(depth_data[:, :, 0], dtype=torch.float32)
-            depth_data = torch.flip(depth_data, dims=[0, 1]) # Flip vertically and horizontally
+            # Flip vertically and horizontally
+            depth_data = torch.flip(depth_data, dims=[0, 1])
             # max_depth = depth_data.max()
             # depth_data = max_depth - depth_data  # Invert depth values
             import matplotlib.pyplot as plt
             import numpy as np
 
             # Convert to NumPy array if it's a tensor
-            depth_map = depth_data.numpy() if isinstance(depth_data, torch.Tensor) else depth_data
+            depth_map = depth_data.numpy() if isinstance(
+                depth_data, torch.Tensor) else depth_data
 
             # Normalize the depth map for better visualization
-            depth_map_normalized = (depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
+            depth_map_normalized = (
+                depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
 
             # Plot heatmap
             plt.figure(figsize=(8, 6))
@@ -234,14 +238,17 @@ class ChronoEnv:
             camera_data = torch.tensor(camera_data, dtype=torch.uint8)
             # Remove the 4th column which is transparency
             camera_data = camera_data[:, :, :3]
-            camera_data = torch.flip(camera_data, dims=[0]) # Flip vertically
+            camera_data = torch.flip(camera_data, dims=[0])  # Flip vertically
         else:
             camera_data = torch.zeros(
                 self.image_height, self.image_width, 3, dtype=torch.uint8)
 
-        robot_x = torch.tensor(self.virtual_robot.GetPos().x, dtype=torch.float32)
-        robot_y = torch.tensor(self.virtual_robot.GetPos().y, dtype=torch.float32)
-        robot_yaw = torch.tensor(self.virtual_robot.GetRot().GetCardanAnglesXYZ().y, dtype=torch.float32)
+        robot_x = torch.tensor(
+            self.virtual_robot.GetPos().x, dtype=torch.float32)
+        robot_y = torch.tensor(
+            self.virtual_robot.GetPos().y, dtype=torch.float32)
+        robot_yaw = torch.tensor(self.quaternion_to_yaw(
+            self.virtual_robot.GetRot()), dtype=torch.float32)
 
         obs_dict = {
             "rgb": camera_data,
@@ -257,21 +264,31 @@ class ChronoEnv:
         # Convert action tensor to integer
         if len(action[0]) > 1:
             print(float(action[0][0]), float(action[0][1]))
-            robot.SetPos(chrono.ChVector3d(float(action[0][0]) - 0.5, 0.25, float(action[0][1])-0.5))
+            robot.SetPos(chrono.ChVector3d(
+                float(action[0][0]) - 0.5, 0.25, float(action[0][1])-0.5))
         else:
             action_id = action.item()
 
             if action_id == 1:  # MOVE_FORWARD
                 robot.SetPos(robot.GetPos() + chrono.ChVector3d(
-                    0.01 * np.sin(robot.GetRot().GetCardanAnglesXYZ().y + np.pi/2),
+                    0.01 *
+                    np.sin(robot.GetRot().GetCardanAnglesXYZ().y + np.pi/2),
                     0,
-                    0.01 * np.cos(robot.GetRot().GetCardanAnglesXYZ().y + np.pi/2)
+                    0.01 *
+                    np.cos(robot.GetRot().GetCardanAnglesXYZ().y + np.pi/2)
                 ))
             elif action_id == 2:  # TURN_LEFT
                 robot.SetRot(chrono.QuatFromAngleY(np.pi/6)*robot.GetRot())
 
             elif action_id == 3:  # TURN_RIGHT
                 robot.SetRot(chrono.QuatFromAngleY(-np.pi/6)*robot.GetRot())
+
+    def quaternion_to_yaw(quaternion):
+        # Unpack quaternion
+        w, x, y, z = quaternion
+
+        yaw = np.arctan2(2 * (w * y + x * z), 1 - 2 * (y**2 + z**2))
+        return yaw
 
 
 if __name__ == "__main__":
@@ -346,7 +363,8 @@ if __name__ == "__main__":
         # Annotated Depth Image
         plt.subplot(1, 2, 1)
         plt.title("Annotated Depth")
-        plt.imshow(annotated_depth, cmap='gray')  # Use grayscale for depth visualization
+        # Use grayscale for depth visualization
+        plt.imshow(annotated_depth, cmap='gray')
         plt.axis('off')
         # RGB Image
         plt.subplot(1, 2, 2)
@@ -361,7 +379,6 @@ if __name__ == "__main__":
         timestamp = time.strftime("%Y%m%d-%H%M%S")
         plt.savefig(f"tmp_vis_2/policy_info_visualization_{timestamp}.png")
         plt.close()
-
 
         # obs, stop = env.step(torch.tensor(0))
         print(vlfm_policy._policy_info)
