@@ -14,7 +14,7 @@ project_root = os.path.abspath(os.path.join(current_dir, '../../'))
 sys.path.append(project_root)
 # Add the parent directory of 'models' to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+import time
 
 class ChronoEnv:
     def __init__(self, target_object: str = "chair"):
@@ -202,6 +202,9 @@ class ChronoEnv:
             depth_data = depth_buffer.GetDIData()
             # Removes the 2nd column which is intensity
             depth_data = torch.tensor(depth_data[:, :, 0], dtype=torch.float32)
+            depth_data = torch.flip(depth_data, dims=[0, 1]) # Flip vertically and horizontally
+            max_depth = depth_data.max()
+            depth_data = max_depth - depth_data  # Invert depth values
             print('shape of depth data: ', depth_data.shape)
         else:
             depth_data = torch.zeros(
@@ -213,6 +216,7 @@ class ChronoEnv:
             camera_data = torch.tensor(camera_data, dtype=torch.uint8)
             # Remove the 4th column which is transparency
             camera_data = camera_data[:, :, :3]
+            camera_data = torch.flip(camera_data, dims=[0]) # Flip vertically
             print('shape of camera data: ', camera_data.shape)
         else:
             camera_data = torch.zeros(
@@ -304,13 +308,41 @@ if __name__ == "__main__":
 
     end_time = 10
     control_timestep = 0.1
-    time = 0
+    time_count = 0
     masks = torch.zeros(1, 1)
-    while time < end_time:
+    while time_count < end_time:
         action, _ = vlfm_policy.act(obs, None, None, masks)
         masks = torch.ones(1, 1)
         obs, stop = env.step(action)
+
+        # Visualize the depth and RGB images
+        import matplotlib.pyplot as plt
+        # Convert depth and RGB observations to numpy arrays
+        annotated_depth = obs["depth"].numpy()
+        rgb_image = obs["rgb"].numpy()
+        # Plot the depth and RGB images
+        plt.figure(figsize=(15, 5))
+        # Annotated Depth Image
+        plt.subplot(1, 2, 1)
+        plt.title("Annotated Depth")
+        plt.imshow(annotated_depth, cmap='gray')  # Use grayscale for depth visualization
+        plt.axis('off')
+        # RGB Image
+        plt.subplot(1, 2, 2)
+        plt.title("RGB Image")
+        plt.imshow(rgb_image)  # No need for cmap, as it's an RGB image
+        plt.axis('off')
+        # Display the plot
+        plt.tight_layout()
+        # ---------------------------------------
+
+        # Save the figure to a file with a unique name
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        plt.savefig(f"tmp_vis_2/policy_info_visualization_{timestamp}.png")
+        plt.close()
+
+
         # obs, stop = env.step(torch.tensor(0))
         print(vlfm_policy._policy_info)
 
-        time += control_timestep
+        time_count += control_timestep

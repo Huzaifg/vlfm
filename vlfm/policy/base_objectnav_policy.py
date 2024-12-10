@@ -245,7 +245,7 @@ class BaseObjectNavPolicy(BasePolicy):
 
         # Save the figure to a file with a unique name
         timestamp = time.strftime("%Y%m%d-%H%M%S")
-        # plt.savefig(f"policy_info_visualization_{timestamp}.png")
+        plt.savefig(f"tmp_vis/policy_info_visualization_{timestamp}.png")
         plt.close()
 
         if "DEBUG_INFO" in os.environ:
