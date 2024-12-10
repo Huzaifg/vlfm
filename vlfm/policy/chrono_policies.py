@@ -23,6 +23,7 @@ class TorchActionIDs:
     MOVE_FORWARD = torch.tensor([[1]], dtype=torch.long)
     TURN_LEFT = torch.tensor([[2]], dtype=torch.long)
     TURN_RIGHT = torch.tensor([[3]], dtype=torch.long)
+    GOAL = torch.tensor([[4]], dtype=torch.float32)
 
 
 class ChronoMixin:

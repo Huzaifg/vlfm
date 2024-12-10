@@ -17,7 +17,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import time
 
 class ChronoEnv:
-    def __init__(self, target_object: str = "chair"):
+    def __init__(self, target_object: str = "bed"):
         self.my_system = None
 
         # Output directory
@@ -203,9 +203,27 @@ class ChronoEnv:
             # Removes the 2nd column which is intensity
             depth_data = torch.tensor(depth_data[:, :, 0], dtype=torch.float32)
             depth_data = torch.flip(depth_data, dims=[0, 1]) # Flip vertically and horizontally
-            max_depth = depth_data.max()
-            depth_data = max_depth - depth_data  # Invert depth values
-            print('shape of depth data: ', depth_data.shape)
+            # max_depth = depth_data.max()
+            # depth_data = max_depth - depth_data  # Invert depth values
+            import matplotlib.pyplot as plt
+            import numpy as np
+
+            # Convert to NumPy array if it's a tensor
+            depth_map = depth_data.numpy() if isinstance(depth_data, torch.Tensor) else depth_data
+
+            # Normalize the depth map for better visualization
+            depth_map_normalized = (depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
+
+            # Plot heatmap
+            plt.figure(figsize=(8, 6))
+            heatmap = plt.imshow(depth_map_normalized, cmap="viridis")
+            plt.colorbar(heatmap, label="Normalized Depth")
+            plt.axis("off")
+
+            # Save the figure
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            plt.savefig(f"tmp_vis/depthmap_{timestamp}.png")
+            plt.close()
         else:
             depth_data = torch.zeros(
                 self.image_height, self.image_width, dtype=torch.float32)
@@ -217,14 +235,13 @@ class ChronoEnv:
             # Remove the 4th column which is transparency
             camera_data = camera_data[:, :, :3]
             camera_data = torch.flip(camera_data, dims=[0]) # Flip vertically
-            print('shape of camera data: ', camera_data.shape)
         else:
             camera_data = torch.zeros(
                 self.image_height, self.image_width, 3, dtype=torch.uint8)
 
-        robot_x = torch.tensor(0, dtype=torch.float32)
-        robot_y = torch.tensor(0, dtype=torch.float32)
-        robot_yaw = torch.tensor(0, dtype=torch.float32)
+        robot_x = torch.tensor(self.virtual_robot.GetPos().x, dtype=torch.float32)
+        robot_y = torch.tensor(self.virtual_robot.GetPos().y, dtype=torch.float32)
+        robot_yaw = torch.tensor(self.virtual_robot.GetRot().GetCardanAnglesXYZ().y, dtype=torch.float32)
 
         obs_dict = {
             "rgb": camera_data,
@@ -238,19 +255,23 @@ class ChronoEnv:
 
     def _do_action(self, action, robot):
         # Convert action tensor to integer
-        action_id = action.item()
+        if len(action[0]) > 1:
+            print(float(action[0][0]), float(action[0][1]))
+            robot.SetPos(chrono.ChVector3d(float(action[0][0]) - 0.5, 0.25, float(action[0][1])-0.5))
+        else:
+            action_id = action.item()
 
-        if action_id == 1:  # MOVE_FORWARD
-            robot.SetPos(robot.GetPos() + chrono.ChVector3d(
-                0.01 * np.sin(robot.GetRot().GetCardanAnglesXYZ().y + np.pi/2),
-                0,
-                0.01 * np.cos(robot.GetRot().GetCardanAnglesXYZ().y + np.pi/2)
-            ))
-        elif action_id == 2:  # TURN_LEFT
-            robot.SetRot(chrono.QuatFromAngleY(np.pi/6)*robot.GetRot())
+            if action_id == 1:  # MOVE_FORWARD
+                robot.SetPos(robot.GetPos() + chrono.ChVector3d(
+                    0.01 * np.sin(robot.GetRot().GetCardanAnglesXYZ().y + np.pi/2),
+                    0,
+                    0.01 * np.cos(robot.GetRot().GetCardanAnglesXYZ().y + np.pi/2)
+                ))
+            elif action_id == 2:  # TURN_LEFT
+                robot.SetRot(chrono.QuatFromAngleY(np.pi/6)*robot.GetRot())
 
-        elif action_id == 3:  # TURN_RIGHT
-            robot.SetRot(chrono.QuatFromAngleY(-np.pi/6)*robot.GetRot())
+            elif action_id == 3:  # TURN_RIGHT
+                robot.SetRot(chrono.QuatFromAngleY(-np.pi/6)*robot.GetRot())
 
 
 if __name__ == "__main__":
@@ -260,7 +281,7 @@ if __name__ == "__main__":
     # sensor params
     camera_height = 0.0
     min_depth = 0.1
-    max_depth = 5.0
+    max_depth = 1.0
     camera_fov = 80.67
     image_width = 640
 
@@ -270,12 +291,12 @@ if __name__ == "__main__":
     use_max_confidence = False
     pointnav_policy_path = "data/pointnav_weights.pth"
     depth_image_shape = (480, 640)
-    pointnav_stop_radius = 0.01
+    pointnav_stop_radius = 0.5
     object_map_erosion_size = 5
     exploration_thresh = 0.0
-    obstacle_map_area_threshold = 1.5  # in square meters
+    obstacle_map_area_threshold = 3.5  # in square meters
     min_obstacle_height = 0.1
-    max_obstacle_height = 0.4
+    max_obstacle_height = 0.5
     hole_area_thresh = 100000
     use_vqa = False
     vqa_prompt = "Is this "

@@ -75,8 +75,6 @@ class BaseObjectNavPolicy(BasePolicy):
         # self._pointnav_policy = WrappedPointNavResNetPolicy(pointnav_policy_path)
         self._object_map: ObjectPointCloudMap = ObjectPointCloudMap(
             erosion_size=object_map_erosion_size)
-        print("depth_image_shape", depth_image_shape)
-        print("depth_image_shape_type", type(depth_image_shape))
         self._depth_image_shape = tuple(depth_image_shape)
         # self._pointnav_stop_radius = pointnav_stop_radius
         self._visualize = visualize
@@ -144,7 +142,7 @@ class BaseObjectNavPolicy(BasePolicy):
             pointnav_action = self._explore(observations)
         else:
             mode = "navigate"
-            # pointnav_action = self._pointnav(goal[:2], stop=True)
+            pointnav_action = self._pointnav(goal[:2], stop=True)
 
         action_numpy = pointnav_action.detach().cpu().numpy()[0]
         if len(action_numpy) == 1:
@@ -224,9 +222,9 @@ class BaseObjectNavPolicy(BasePolicy):
         policy_info["annotated_rgb"] = annotated_rgb
         policy_info["annotated_depth"] = annotated_depth
 
-        # Visualize the depth map
+        # # Visualize the depth map
         import matplotlib.pyplot as plt
-        plt.figure(figsize=(10, 5))
+        plt.figure(figsize=(16, 8))
         plt.subplot(1, 2, 1)
         plt.title("Annotated Depth")
         plt.imshow(annotated_depth)
@@ -234,13 +232,21 @@ class BaseObjectNavPolicy(BasePolicy):
 
         if self._compute_frontiers:
             obstacle_map_rgb = cv2.cvtColor(
-                self._obstacle_map.visualize(), cv2.COLOR_BGR2RGB)
+                self._obstacle_map.visualize(), cv2.COLOR_BGR2RGB
+            )
             policy_info["obstacle_map"] = obstacle_map_rgb
 
-            # Visualize the frontier map
+            # Zoom in on a portion of the obstacle map (crop the image)
+            height, width, _ = obstacle_map_rgb.shape
+            cropped_map = obstacle_map_rgb[
+                height // 4 : 2 * height // 3,  # Vertical range
+                width // 3 : 2 * width // 3    # Horizontal range
+            ]
+
+            # Visualize the zoomed-in obstacle map
             plt.subplot(1, 2, 2)
-            plt.title("Obstacle Map")
-            plt.imshow(obstacle_map_rgb)
+            plt.title("Obstacle Map (Zoomed In)")
+            plt.imshow(cropped_map)
             plt.axis('off')
 
         # Save the figure to a file with a unique name
@@ -277,6 +283,10 @@ class BaseObjectNavPolicy(BasePolicy):
             detections.filter_by_conf(self._non_coco_threshold)
 
         return detections
+
+    def _pointnav(self, goal: np.ndarray, stop: bool = False) -> Tensor:
+        action = torch.tensor([[goal[0], goal[1]]], dtype=torch.float32)
+        return action
 
     # def _pointnav(self, goal: np.ndarray, stop: bool = False) -> Tensor:
     #     """
