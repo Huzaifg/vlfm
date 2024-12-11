@@ -193,10 +193,15 @@ class ChronoEnv:
         self.vis.EndScene()
         self.observations = self._get_observations()
 
-        self.stop = self._get_stop()
+        self.stop = self._get_stop(action)
+
         return self.observations, self.stop
 
-    def _get_stop(self):
+    def _get_stop(self, action):
+        if action[0][0] == 0:
+            print("STOPPED")
+            time.sleep(5)
+            return True
         return False
 
     def _get_observations(self):
@@ -278,7 +283,7 @@ class ChronoEnv:
             current_heading = robot.GetRot().GetCardanAnglesXYZ().z
             turn_angle = heading  # - current_heading
             print("TURN ANGLE: ", turn_angle)
-            robot.SetRot(chrono.QuatFromAngleZ(turn_angle))
+            robot.SetRot(chrono.QuatFromAngleZ(turn_angle)*robot.GetRot())
 
             robot.SetPos(chrono.ChVector3d(
                 float(action[0][1]), float(action[0][0]), 0.25))
@@ -376,6 +381,8 @@ if __name__ == "__main__":
         action, _ = vlfm_policy.act(obs, None, None, masks)
         masks = torch.ones(1, 1)
         obs, stop = env.step(action)
+        if stop:
+            break
 
         # Visualize the depth and RGB images
         import matplotlib.pyplot as plt

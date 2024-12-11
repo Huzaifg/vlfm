@@ -143,7 +143,7 @@ class BaseObjectNavPolicy(BasePolicy):
             print("explore -------------------------------------------------")
         else:
             mode = "navigate"
-            pointnav_action = self._pointnav(goal[:2], stop=True)
+            pointnav_action = self._pointnav_navigate(goal[:2], stop=True)
 
         action_numpy = pointnav_action.detach().cpu().numpy()[0]
         if len(action_numpy) == 1:
@@ -240,8 +240,8 @@ class BaseObjectNavPolicy(BasePolicy):
             # Zoom in on a portion of the obstacle map (crop the image)
             height, width, _ = obstacle_map_rgb.shape
             cropped_map = obstacle_map_rgb[
-                height // 4 : 2 * height // 3,  # Vertical range
-                width // 3 : 2 * width // 3    # Horizontal range
+                height // 4: 2 * height // 3,  # Vertical range
+                width // 3: 2 * width // 3    # Horizontal range
             ]
 
             # Visualize the zoomed-in obstacle map
@@ -287,6 +287,13 @@ class BaseObjectNavPolicy(BasePolicy):
 
     def _pointnav(self, goal: np.ndarray, stop: bool = False) -> Tensor:
         action = torch.tensor([[goal[0], goal[1]]], dtype=torch.float32)
+        return action
+
+    def _pointnav_navigate(self, goal: np.ndarray, stop: bool = False) -> Tensor:
+        if self._called_stop:
+            return torch.tensor([[0]], dtype=torch.float32)
+        action = torch.tensor([[goal[0], goal[1]]], dtype=torch.float32)
+        self._called_stop = True
         return action
 
     # def _pointnav(self, goal: np.ndarray, stop: bool = False) -> Tensor:
