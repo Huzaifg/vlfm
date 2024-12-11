@@ -3,7 +3,6 @@ import vlfm.policy.chrono_policies
 import math
 import numpy as np
 import pychrono.sensor as sens
-import pychrono.vehicle as veh
 import pychrono.irrlicht as chronoirr
 import pychrono as chrono
 import sys
@@ -18,7 +17,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
 class ChronoEnv:
-    def __init__(self, target_object: str = "bed"):
+    def __init__(self, target_object: str = "tv"):
         self.my_system = None
 
         # Output directory
@@ -218,16 +217,16 @@ class ChronoEnv:
             depth_map_normalized = (
                 depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
 
-            # Plot heatmap
-            plt.figure(figsize=(8, 6))
-            heatmap = plt.imshow(depth_map_normalized, cmap="viridis")
-            plt.colorbar(heatmap, label="Normalized Depth")
-            plt.axis("off")
+            # # Plot heatmap
+            # plt.figure(figsize=(8, 6))
+            # heatmap = plt.imshow(depth_map_normalized, cmap="viridis")
+            # plt.colorbar(heatmap, label="Normalized Depth")
+            # plt.axis("off")
 
-            # Save the figure
-            timestamp = time.strftime("%Y%m%d-%H%M%S")
-            plt.savefig(f"tmp_vis/depthmap_{timestamp}.png")
-            plt.close()
+            # # Save the figure
+            # timestamp = time.strftime("%Y%m%d-%H%M%S")
+            # plt.savefig(f"tmp_vis/depthmap_{timestamp}.png")
+            # plt.close()
         else:
             depth_data = torch.zeros(
                 self.image_height, self.image_width, dtype=torch.float32)
@@ -246,7 +245,7 @@ class ChronoEnv:
         robot_x = torch.tensor(
             self.virtual_robot.GetPos().x, dtype=torch.float32)
         robot_y = torch.tensor(
-            self.virtual_robot.GetPos().y, dtype=torch.float32)
+            self.virtual_robot.GetPos().z, dtype=torch.float32)
 
         quat_list = [self.virtual_robot.GetRot().e0, self.virtual_robot.GetRot().e1,
                      self.virtual_robot.GetRot().e2, self.virtual_robot.GetRot().e3]
@@ -266,9 +265,27 @@ class ChronoEnv:
     def _do_action(self, action, robot):
         # Convert action tensor to integer
         if len(action[0]) > 1:
-            print(float(action[0][0]), float(action[0][1]))
-            robot.SetPos(chrono.ChVector3d(
-                float(action[0][0]) - 0.5, 0.25, float(action[0][1])-0.5))
+            print("target pos: ",float(action[0][0]), float(action[0][1]))
+            print("CUR POS: ", robot.GetPos())
+            cur_pos = robot.GetPos()
+            heading = math.atan2(float(action[0][1]) - cur_pos.z, float(action[0][0]) - cur_pos.x)
+            quat_list = [self.virtual_robot.GetRot().e0, self.virtual_robot.GetRot().e1,
+                        self.virtual_robot.GetRot().e2, self.virtual_robot.GetRot().e3]
+            current_heading = self.quaternion_to_yaw(quat_list)
+            turn_angle = heading #- current_heading
+            print("TURN ANGLE: ", turn_angle)
+            robot.SetRot(chrono.QuatFromAngleY(turn_angle)*robot.GetRot())
+
+            robot.SetPos(chrono.ChVector3d(float(action[0][0]), 0.25, float(action[0][1])))
+
+            # heading = math.atan2(float(action[0][1]) - cur_pos.z, float(action[0][0]) - cur_pos.x)
+            # quat_list = [self.virtual_robot.GetRot().e0, self.virtual_robot.GetRot().e1,
+            #             self.virtual_robot.GetRot().e2, self.virtual_robot.GetRot().e3]
+            # current_heading = self.quaternion_to_yaw(quat_list)
+            # turn_angle = heading - current_heading
+            # print("TURN ANGLE: ", turn_angle)
+            # robot.SetRot(chrono.QuatFromAngleY(turn_angle))
+            
         else:
             action_id = action.item()
 
@@ -299,7 +316,7 @@ if __name__ == "__main__":
     obs = env.reset()
 
     # sensor params
-    camera_height = 0.0
+    camera_height = 0.5
     min_depth = 0.1
     max_depth = 1.0
     camera_fov = 80.67
@@ -316,7 +333,7 @@ if __name__ == "__main__":
     exploration_thresh = 0.0
     obstacle_map_area_threshold = 3.5  # in square meters
     min_obstacle_height = 0.1
-    max_obstacle_height = 0.5
+    max_obstacle_height = 0.7
     hole_area_thresh = 100000
     use_vqa = False
     vqa_prompt = "Is this "
@@ -384,6 +401,6 @@ if __name__ == "__main__":
         plt.close()
 
         # obs, stop = env.step(torch.tensor(0))
-        print(vlfm_policy._policy_info)
+        # print(vlfm_policy._policy_info)
 
         time_count += control_timestep

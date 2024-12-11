@@ -140,6 +140,7 @@ class BaseObjectNavPolicy(BasePolicy):
         elif goal is None:  # Haven't found target object yet
             mode = "explore"
             pointnav_action = self._explore(observations)
+            print("explore -------------------------------------------------")
         else:
             mode = "navigate"
             pointnav_action = self._pointnav(goal[:2], stop=True)
