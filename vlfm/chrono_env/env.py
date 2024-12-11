@@ -174,7 +174,8 @@ class ChronoEnv:
         self.vis.EnableAbsCoordsysDrawing(True)
         self.vis.Initialize()
         self.vis.AddSkyBox()
-        self.vis.AddCamera(chrono.ChVector3d(-2.5, 0, 2.5), chrono.ChVector3d(0, 0, 0))
+        self.vis.AddCamera(chrono.ChVector3d(-2.5, 0, 2.5),
+                           chrono.ChVector3d(0, 0, 0))
 
         self.observations = self._get_observations()
 
@@ -248,12 +249,12 @@ class ChronoEnv:
         robot_x = torch.tensor(
             self.virtual_robot.GetPos().x, dtype=torch.float32)
         robot_y = torch.tensor(
-            self.virtual_robot.GetPos().z, dtype=torch.float32)
+            self.virtual_robot.GetPos().y, dtype=torch.float32)
 
-        quat_list = [self.virtual_robot.GetRot().e0, self.virtual_robot.GetRot().e1,
-                     self.virtual_robot.GetRot().e2, self.virtual_robot.GetRot().e3]
-        yaw = self.quaternion_to_yaw(quat_list)
-        robot_yaw = torch.tensor(yaw, dtype=torch.float32)
+        # quat_list = [self.virtual_robot.GetRot().e0, self.virtual_robot.GetRot().e1,
+        #  self.virtual_robot.GetRot().e2, self.virtual_robot.GetRot().e3]
+        robot_yaw = torch.tensor(self.virtual_robot.GetRot(
+        ).GetCardanAnglesXYZ().z, dtype=torch.float32)
 
         obs_dict = {
             "rgb": camera_data,
@@ -268,18 +269,20 @@ class ChronoEnv:
     def _do_action(self, action, robot):
         # Convert action tensor to integer
         if len(action[0]) > 1:
-            print("target pos: ",float(action[0][0]), float(action[0][1]))
+            print("target pos: ", float(action[0][0]), float(action[0][1]))
             print("CUR POS: ", robot.GetPos())
             cur_pos = robot.GetPos()
-            heading = math.atan2(float(action[0][1]) - cur_pos.z, float(action[0][0]) - cur_pos.x)
+            heading = math.atan2(
+                float(action[0][1]) - cur_pos.y, float(action[0][0]) - cur_pos.x)
             quat_list = [self.virtual_robot.GetRot().e0, self.virtual_robot.GetRot().e1,
-                        self.virtual_robot.GetRot().e2, self.virtual_robot.GetRot().e3]
+                         self.virtual_robot.GetRot().e2, self.virtual_robot.GetRot().e3]
             current_heading = robot.GetRot().GetCardanAnglesXYZ().z
-            turn_angle = heading #- current_heading
+            turn_angle = heading  # - current_heading
             print("TURN ANGLE: ", turn_angle)
-            robot.SetRot(chrono.QuatFromAngleY(turn_angle)*robot.GetRot())
+            robot.SetRot(chrono.QuatFromAngleZ(turn_angle)*robot.GetRot())
 
-            robot.SetPos(chrono.ChVector3d(float(action[0][0]), 0.25, float(action[0][1])))
+            robot.SetPos(chrono.ChVector3d(
+                float(action[0][0]), float(action[0][1]), 0.25))
 
             # heading = math.atan2(float(action[0][1]) - cur_pos.z, float(action[0][0]) - cur_pos.x)
             # quat_list = [self.virtual_robot.GetRot().e0, self.virtual_robot.GetRot().e1,
@@ -288,13 +291,14 @@ class ChronoEnv:
             # turn_angle = heading - current_heading
             # print("TURN ANGLE: ", turn_angle)
             # robot.SetRot(chrono.QuatFromAngleY(turn_angle))
-            
+
         else:
             action_id = action.item()
 
             if action_id == 1:  # MOVE_FORWARD
                 rot_state = robot.GetRot().GetCardanAnglesXYZ()
-                robot.SetPos(robot.GetPos()+chrono.ChVector3d(0.01*np.cos(rot_state.z),0.01*np.sin(rot_state.z), 0))
+                robot.SetPos(robot.GetPos()+chrono.ChVector3d(0.01 *
+                             np.cos(rot_state.z), 0.01*np.sin(rot_state.z), 0))
 
             elif action_id == 2:  # TURN_LEFT
                 robot.SetRot(chrono.QuatFromAngleZ(np.pi/6)*robot.GetRot())
@@ -315,7 +319,7 @@ if __name__ == "__main__":
     obs = env.reset()
 
     # sensor params
-    camera_height = 0.5
+    camera_height = 0.25
     min_depth = 0.1
     max_depth = 1.0
     camera_fov = 80.67
