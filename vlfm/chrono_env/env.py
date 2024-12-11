@@ -247,8 +247,11 @@ class ChronoEnv:
             self.virtual_robot.GetPos().x, dtype=torch.float32)
         robot_y = torch.tensor(
             self.virtual_robot.GetPos().y, dtype=torch.float32)
-        robot_yaw = torch.tensor(self.quaternion_to_yaw(
-            self.virtual_robot.GetRot()), dtype=torch.float32)
+
+        quat_list = [self.virtual_robot.GetRot().e0, self.virtual_robot.GetRot().e1,
+                     self.virtual_robot.GetRot().e2, self.virtual_robot.GetRot().e3]
+        yaw = self.quaternion_to_yaw(quat_list)
+        robot_yaw = torch.tensor(yaw, dtype=torch.float32)
 
         obs_dict = {
             "rgb": camera_data,
@@ -283,7 +286,7 @@ class ChronoEnv:
             elif action_id == 3:  # TURN_RIGHT
                 robot.SetRot(chrono.QuatFromAngleY(-np.pi/6)*robot.GetRot())
 
-    def quaternion_to_yaw(quaternion):
+    def quaternion_to_yaw(self, quaternion):
         # Unpack quaternion
         w, x, y, z = quaternion
 
