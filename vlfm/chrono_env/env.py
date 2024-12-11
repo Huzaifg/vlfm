@@ -76,7 +76,7 @@ class ChronoEnv:
         # terrain.Initialize()
         self.virtual_robot = chrono.ChBodyEasyBox(
             0.5, 0.5, 0.5, 100, True, True, patch_mat)
-        self.virtual_robot.SetPos(chrono.ChVector3d(0, 0.25, 0))
+        self.virtual_robot.SetPos(chrono.ChVector3d(0, 0, 0.25))
         self.virtual_robot.SetFixed(True)
         self.my_system.Add(self.virtual_robot)
         mmesh = chrono.ChTriangleMeshConnected()
@@ -93,6 +93,7 @@ class ChronoEnv:
 
         mesh_body = chrono.ChBody()
         mesh_body.SetPos(chrono.ChVector3d(0, 0, 0))
+        mesh_body.SetRot(chrono.Q_ROTATE_Y_TO_Z)
         mesh_body.AddVisualShape(trimesh_shape)
         mesh_body.SetFixed(True)
         self.my_system.Add(mesh_body)
@@ -112,7 +113,7 @@ class ChronoEnv:
             intensity, intensity, intensity), 500.0, chrono.ChVector3f(1, 0, 0), chrono.ChVector3f(0, -1, 0))
 
         offset_pose = chrono.ChFramed(
-            chrono.ChVector3d(0, 0.5, 0), chrono.Q_ROTATE_Z_TO_Y)
+            chrono.ChVector3d(0, 0, 0.5), chrono.QUNIT)
 
         self.lidar = sens.ChLidarSensor(
             self.virtual_robot,             # body lidar is attached to
@@ -160,18 +161,20 @@ class ChronoEnv:
 
         # ---------------------------------------
 
-        # Create visualization for the gripper fingers
-        self.vis = chronoirr.ChVisualSystemIrrlicht(
-            self.my_system, chrono.ChVector3d(-2, 1, -1))
+        # Create visualization
+        self.vis = chronoirr.ChVisualSystemIrrlicht(self.my_system)
         self.vis.SetCameraVertical(chrono.CameraVerticalDir_Z)
         self.vis.AddLightWithShadow(chrono.ChVector3d(6, 6, 6),  # point
-                                    chrono.ChVector3d(0, 6, 0),  # aimpoint
+                                    chrono.ChVector3d(0, 0, 0),  # aimpoint
                                     5,                       # radius (power)
                                     1, 11,                     # near, far
                                     55)                       # angle of FOV
 
         # vis.EnableShadows()
-        self.vis.EnableCollisionShapeDrawing(True)
+        self.vis.EnableAbsCoordsysDrawing(True)
+        self.vis.Initialize()
+        self.vis.AddSkyBox()
+        self.vis.AddCamera(chrono.ChVector3d(-2.5, 0, 2.5), chrono.ChVector3d(0, 0, 0))
 
         self.observations = self._get_observations()
 
@@ -271,7 +274,7 @@ class ChronoEnv:
             heading = math.atan2(float(action[0][1]) - cur_pos.z, float(action[0][0]) - cur_pos.x)
             quat_list = [self.virtual_robot.GetRot().e0, self.virtual_robot.GetRot().e1,
                         self.virtual_robot.GetRot().e2, self.virtual_robot.GetRot().e3]
-            current_heading = self.quaternion_to_yaw(quat_list)
+            current_heading = robot.GetRot().GetCardanAnglesXYZ().z
             turn_angle = heading #- current_heading
             print("TURN ANGLE: ", turn_angle)
             robot.SetRot(chrono.QuatFromAngleY(turn_angle)*robot.GetRot())
@@ -290,18 +293,14 @@ class ChronoEnv:
             action_id = action.item()
 
             if action_id == 1:  # MOVE_FORWARD
-                robot.SetPos(robot.GetPos() + chrono.ChVector3d(
-                    0.01 *
-                    np.sin(robot.GetRot().GetCardanAnglesXYZ().y + np.pi/2),
-                    0,
-                    0.01 *
-                    np.cos(robot.GetRot().GetCardanAnglesXYZ().y + np.pi/2)
-                ))
+                rot_state = robot.GetRot().GetCardanAnglesXYZ()
+                robot.SetPos(robot.GetPos()+chrono.ChVector3d(0.01*np.cos(rot_state.z),0.01*np.sin(rot_state.z), 0))
+
             elif action_id == 2:  # TURN_LEFT
-                robot.SetRot(chrono.QuatFromAngleY(np.pi/6)*robot.GetRot())
+                robot.SetRot(chrono.QuatFromAngleZ(np.pi/6)*robot.GetRot())
 
             elif action_id == 3:  # TURN_RIGHT
-                robot.SetRot(chrono.QuatFromAngleY(-np.pi/6)*robot.GetRot())
+                robot.SetRot(chrono.QuatFromAngleZ(-np.pi/6)*robot.GetRot())
 
     def quaternion_to_yaw(self, quaternion):
         # Unpack quaternion
