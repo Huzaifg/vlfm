@@ -191,7 +191,6 @@ class ChronoEnv:
         self.vis.BeginScene()
         self.vis.Render()
         self.vis.EndScene()
-
         self.observations = self._get_observations()
 
         self.stop = self._get_stop()
@@ -247,14 +246,14 @@ class ChronoEnv:
                 self.image_height, self.image_width, 3, dtype=torch.uint8)
 
         robot_x = torch.tensor(
-            self.virtual_robot.GetPos().x, dtype=torch.float32)
-        robot_y = torch.tensor(
             self.virtual_robot.GetPos().y, dtype=torch.float32)
+        robot_y = torch.tensor(
+            self.virtual_robot.GetPos().x, dtype=torch.float32)
 
-        # quat_list = [self.virtual_robot.GetRot().e0, self.virtual_robot.GetRot().e1,
-        #  self.virtual_robot.GetRot().e2, self.virtual_robot.GetRot().e3]
-        robot_yaw = torch.tensor(self.virtual_robot.GetRot(
-        ).GetCardanAnglesXYZ().z, dtype=torch.float32)
+        quat_list = [self.virtual_robot.GetRot().e0, self.virtual_robot.GetRot().e1,
+                     self.virtual_robot.GetRot().e2, self.virtual_robot.GetRot().e3]
+        yaw = self.quaternion_to_yaw(quat_list)
+        robot_yaw = torch.tensor(yaw, dtype=torch.float32)
 
         obs_dict = {
             "rgb": camera_data,
@@ -273,16 +272,17 @@ class ChronoEnv:
             print("CUR POS: ", robot.GetPos())
             cur_pos = robot.GetPos()
             heading = math.atan2(
-                float(action[0][1]) - cur_pos.y, float(action[0][0]) - cur_pos.x)
+                float(action[0][0]) - cur_pos.y, float(action[0][1]) - cur_pos.x)
             quat_list = [self.virtual_robot.GetRot().e0, self.virtual_robot.GetRot().e1,
                          self.virtual_robot.GetRot().e2, self.virtual_robot.GetRot().e3]
             current_heading = robot.GetRot().GetCardanAnglesXYZ().z
             turn_angle = heading  # - current_heading
             print("TURN ANGLE: ", turn_angle)
-            robot.SetRot(chrono.QuatFromAngleZ(turn_angle)*robot.GetRot())
+            robot.SetRot(chrono.QuatFromAngleZ(turn_angle))
 
             robot.SetPos(chrono.ChVector3d(
-                float(action[0][0]), float(action[0][1]), 0.25))
+                float(action[0][1]), float(action[0][0]), 0.25))
+            print("Moved Pos: ", robot.GetPos())
 
             # heading = math.atan2(float(action[0][1]) - cur_pos.z, float(action[0][0]) - cur_pos.x)
             # quat_list = [self.virtual_robot.GetRot().e0, self.virtual_robot.GetRot().e1,
@@ -310,7 +310,8 @@ class ChronoEnv:
         # Unpack quaternion
         w, x, y, z = quaternion
 
-        yaw = np.arctan2(2 * (w * y + x * z), 1 - 2 * (y**2 + z**2))
+        # Calculate yaw (angle with respect to the x-axis)
+        yaw = np.arctan2(2 * (w * z + x * y), 1 - 2 * (y**2 + z**2))
         return yaw
 
 
