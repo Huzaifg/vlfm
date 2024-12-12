@@ -76,7 +76,7 @@ class ChronoEnv:
         # terrain.Initialize()
         self.virtual_robot = chrono.ChBodyEasyBox(
             0.5, 0.5, 0.5, 100, True, True, patch_mat)
-        self.virtual_robot.SetPos(chrono.ChVector3d(0, 0, 0.25))
+        self.virtual_robot.SetPos(chrono.ChVector3d(-1, 1, 0.25))
         self.virtual_robot.SetFixed(True)
         self.my_system.Add(self.virtual_robot)
         mmesh = chrono.ChTriangleMeshConnected()
@@ -251,9 +251,9 @@ class ChronoEnv:
                 self.image_height, self.image_width, 3, dtype=torch.uint8)
 
         robot_x = torch.tensor(
-            self.virtual_robot.GetPos().y, dtype=torch.float32)
-        robot_y = torch.tensor(
             self.virtual_robot.GetPos().x, dtype=torch.float32)
+        robot_y = torch.tensor(
+            self.virtual_robot.GetPos().y, dtype=torch.float32)
 
         quat_list = [self.virtual_robot.GetRot().e0, self.virtual_robot.GetRot().e1,
                      self.virtual_robot.GetRot().e2, self.virtual_robot.GetRot().e3]
@@ -275,9 +275,10 @@ class ChronoEnv:
         if len(action[0]) > 1:
             print("target pos: ", float(action[0][0]), float(action[0][1]))
             print("CUR POS: ", robot.GetPos())
+            print('size of target pos: ', action.shape)
             cur_pos = robot.GetPos()
             heading = math.atan2(
-                float(action[0][0]) - cur_pos.y, float(action[0][1]) - cur_pos.x)
+                float(action[0][1]) - cur_pos.y, float(action[0][0]) - cur_pos.x)
             quat_list = [self.virtual_robot.GetRot().e0, self.virtual_robot.GetRot().e1,
                          self.virtual_robot.GetRot().e2, self.virtual_robot.GetRot().e3]
             current_heading = robot.GetRot().GetCardanAnglesXYZ().z
@@ -286,7 +287,7 @@ class ChronoEnv:
             robot.SetRot(chrono.QuatFromAngleZ(turn_angle)*robot.GetRot())
 
             robot.SetPos(chrono.ChVector3d(
-                float(action[0][1]), float(action[0][0]), 0.25))
+                float(action[0][0]), float(action[0][1]), 0.25))
             print("Moved Pos: ", robot.GetPos())
 
             # heading = math.atan2(float(action[0][1]) - cur_pos.z, float(action[0][0]) - cur_pos.x)
