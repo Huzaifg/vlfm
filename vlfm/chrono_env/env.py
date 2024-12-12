@@ -17,7 +17,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
 class ChronoEnv:
-    def __init__(self, target_object: str = "tv"):
+    def __init__(self, target_object: str = "chair"):
         self.my_system = None
 
         # Output directory
@@ -277,27 +277,37 @@ class ChronoEnv:
             print("CUR POS: ", robot.GetPos())
             print('size of target pos: ', action.shape)
             cur_pos = robot.GetPos()
-            heading = math.atan2(
-                float(action[0][1]) - cur_pos.y, float(action[0][0]) - cur_pos.x)
-            quat_list = [self.virtual_robot.GetRot().e0, self.virtual_robot.GetRot().e1,
-                         self.virtual_robot.GetRot().e2, self.virtual_robot.GetRot().e3]
+            target_x = float(action[0][0])
+            target_y = float(action[0][1])
+
+            # Calculate heading angle to the target
+            heading = math.atan2(target_y - cur_pos.y, target_x - cur_pos.x)
+            heading = (heading + math.pi) % (2 * math.pi) - math.pi  # Normalize to [-π, π]
+
+            # Get the robot's current heading
             current_heading = robot.GetRot().GetCardanAnglesXYZ().z
-            turn_angle = heading  # - current_heading
+            turn_angle = heading - current_heading
+            turn_angle = (turn_angle + math.pi) % (2 * math.pi) - math.pi  # Normalize to [-π, π]
+
             print("TURN ANGLE: ", turn_angle)
-            robot.SetRot(chrono.QuatFromAngleZ(turn_angle)*robot.GetRot())
+
+            # Update the robot's rotation
+            new_rotation = chrono.QuatFromAngleZ(turn_angle) * robot.GetRot()
+            robot.SetRot(new_rotation)
+
+
+            # heading = math.atan2(
+            #     float(action[0][1]) - cur_pos.y, float(action[0][0]) - cur_pos.x)
+            # quat_list = [self.virtual_robot.GetRot().e0, self.virtual_robot.GetRot().e1,
+            #              self.virtual_robot.GetRot().e2, self.virtual_robot.GetRot().e3]
+            # current_heading = robot.GetRot().GetCardanAnglesXYZ().z
+            # turn_angle = heading  # - current_heading
+            # print("TURN ANGLE: ", turn_angle)
+            # robot.SetRot(chrono.QuatFromAngleZ(turn_angle)*robot.GetRot())
 
             robot.SetPos(chrono.ChVector3d(
                 float(action[0][0]), float(action[0][1]), 0.25))
             print("Moved Pos: ", robot.GetPos())
-
-            # heading = math.atan2(float(action[0][1]) - cur_pos.z, float(action[0][0]) - cur_pos.x)
-            # quat_list = [self.virtual_robot.GetRot().e0, self.virtual_robot.GetRot().e1,
-            #             self.virtual_robot.GetRot().e2, self.virtual_robot.GetRot().e3]
-            # current_heading = self.quaternion_to_yaw(quat_list)
-            # turn_angle = heading - current_heading
-            # print("TURN ANGLE: ", turn_angle)
-            # robot.SetRot(chrono.QuatFromAngleY(turn_angle))
-
         else:
             action_id = action.item()
 
