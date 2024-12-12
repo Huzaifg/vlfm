@@ -340,7 +340,7 @@ if __name__ == "__main__":
     depth_image_shape = (480, 640)
     pointnav_stop_radius = 0.5
     object_map_erosion_size = 5
-    exploration_thresh = 0.0
+    exploration_thresh = 0.7
     obstacle_map_area_threshold = 3.5  # in square meters
     min_obstacle_height = 0.1
     max_obstacle_height = 0.7
@@ -349,7 +349,7 @@ if __name__ == "__main__":
     vqa_prompt = "Is this "
     coco_threshold = 0.8
     non_coco_threshold = 0.4
-    agent_radius = 0.18
+    agent_radius = 0.10
 
     vlfm_policy = vlfm.policy.chrono_policies.ChronoITMPolicy(
         camera_height=camera_height,
