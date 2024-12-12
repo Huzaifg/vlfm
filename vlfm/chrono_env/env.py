@@ -17,7 +17,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
 class ChronoEnv:
-    def __init__(self, target_object: str = "chair"):
+    def __init__(self, target_object: str = "toilet"):
         self.my_system = None
 
         # Output directory
@@ -76,12 +76,12 @@ class ChronoEnv:
         # terrain.Initialize()
         self.virtual_robot = chrono.ChBodyEasyBox(
             0.5, 0.5, 0.5, 100, True, True, patch_mat)
-        self.virtual_robot.SetPos(chrono.ChVector3d(3, 1, 0.25))
+        self.virtual_robot.SetPos(chrono.ChVector3d(1, 1, 0.25))
         self.virtual_robot.SetFixed(True)
         self.my_system.Add(self.virtual_robot)
         mmesh = chrono.ChTriangleMeshConnected()
         mmesh.LoadWavefrontMesh(
-            project_root + '/data/chrono_environment/new_flat.obj', False, True)
+            project_root + '/data/chrono_environment/new_flat_3.obj', False, True)
 
         # scale to a different size
         # mmesh.Transform(chrono.ChVector3d(0, 0, 0), chrono.ChMatrix33d(2))
@@ -113,7 +113,7 @@ class ChronoEnv:
             intensity, intensity, intensity), 500.0, chrono.ChVector3f(1, 0, 0), chrono.ChVector3f(0, -1, 0))
 
         offset_pose = chrono.ChFramed(
-            chrono.ChVector3d(0, 0, 0.5), chrono.QUNIT)
+            chrono.ChVector3d(0.0, 0, 0.5), chrono.QUNIT)
 
         self.lidar = sens.ChLidarSensor(
             self.virtual_robot,             # body lidar is attached to
@@ -121,10 +121,10 @@ class ChronoEnv:
             offset_pose,            # offset pose
             self.image_width,                   # number of horizontal samples
             self.image_height,                    # number of vertical channels
-            1.6,                    # horizontal field of view
+            self.fov,                    # horizontal field of view
             chrono.CH_PI/6,         # vertical field of view
             -chrono.CH_PI/6,
-            5.0,                  # max lidar range
+            5,                  # max lidar range
             sens.LidarBeamShape_RECTANGULAR,
             1,          # sample radius
             0,       # divergence angle
@@ -164,7 +164,7 @@ class ChronoEnv:
         # Create visualization
         self.vis = chronoirr.ChVisualSystemIrrlicht(self.my_system)
         self.vis.SetCameraVertical(chrono.CameraVerticalDir_Z)
-        self.vis.AddLightWithShadow(chrono.ChVector3d(6, 6, 6),  # point
+        self.vis.AddLightWithShadow(chrono.ChVector3d(2, 2, 2),  # point
                                     chrono.ChVector3d(0, 0, 0),  # aimpoint
                                     5,                       # radius (power)
                                     1, 11,                     # near, far
@@ -174,7 +174,7 @@ class ChronoEnv:
         self.vis.EnableAbsCoordsysDrawing(True)
         self.vis.Initialize()
         self.vis.AddSkyBox()
-        self.vis.AddCamera(chrono.ChVector3d(-7, 0, 4.5),
+        self.vis.AddCamera(chrono.ChVector3d(-7/3, 0, 4.5/3),
                            chrono.ChVector3d(0, 0, 0))
 
         self.observations = self._get_observations()
@@ -209,32 +209,19 @@ class ChronoEnv:
         if depth_buffer.HasData():
             depth_data = depth_buffer.GetDIData()
             # Removes the 2nd column which is intensity
-            depth_data = torch.tensor(depth_data[:, :, 0], dtype=torch.float32)
+            depth_data = torch.tensor(
+                depth_data[:, :, 0], dtype=torch.float32)
+
             # Flip vertically and horizontally
             depth_data = torch.flip(depth_data, dims=[0, 1])
-            # max_depth = depth_data.max()
-            # depth_data = max_depth - depth_data  # Invert depth values
-            import matplotlib.pyplot as plt
-            import numpy as np
 
-            # Convert to NumPy array if it's a tensor
-            depth_map = depth_data.numpy() if isinstance(
-                depth_data, torch.Tensor) else depth_data
+            MIN_DEPTH = 0
+            MAX_DEPTH = 7.5
+            depth_data = np.clip(
+                (depth_data - MIN_DEPTH) / (MAX_DEPTH - MIN_DEPTH), 0, 1)
 
-            # Normalize the depth map for better visualization
-            depth_map_normalized = (
-                depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
-
-            # # Plot heatmap
-            # plt.figure(figsize=(8, 6))
-            # heatmap = plt.imshow(depth_map_normalized, cmap="viridis")
-            # plt.colorbar(heatmap, label="Normalized Depth")
-            # plt.axis("off")
-
-            # # Save the figure
-            # timestamp = time.strftime("%Y%m%d-%H%M%S")
-            # plt.savefig(f"tmp_vis/depthmap_{timestamp}.png")
-            # plt.close()
+            # Set pixels to white for depth values greater than MAX_DEPTH
+            depth_data[depth_data > MAX_DEPTH] = 1
         else:
             depth_data = torch.zeros(
                 self.image_height, self.image_width, dtype=torch.float32)
@@ -282,19 +269,20 @@ class ChronoEnv:
 
             # Calculate heading angle to the target
             heading = math.atan2(target_y - cur_pos.y, target_x - cur_pos.x)
-            heading = (heading + math.pi) % (2 * math.pi) - math.pi  # Normalize to [-π, π]
+            heading = (heading + math.pi) % (2 * math.pi) - \
+                math.pi  # Normalize to [-π, π]
 
             # Get the robot's current heading
             current_heading = robot.GetRot().GetCardanAnglesXYZ().z
             turn_angle = heading - current_heading
-            turn_angle = (turn_angle + math.pi) % (2 * math.pi) - math.pi  # Normalize to [-π, π]
+            turn_angle = (turn_angle + math.pi) % (2 * math.pi) - \
+                math.pi  # Normalize to [-π, π]
 
             print("TURN ANGLE: ", turn_angle)
 
             # Update the robot's rotation
             new_rotation = chrono.QuatFromAngleZ(turn_angle) * robot.GetRot()
             robot.SetRot(new_rotation)
-
 
             # heading = math.atan2(
             #     float(action[0][1]) - cur_pos.y, float(action[0][0]) - cur_pos.x)
@@ -336,15 +324,16 @@ if __name__ == "__main__":
     obs = env.reset()
 
     # sensor params
-    camera_height = 0.25
-    min_depth = 0.1
-    max_depth = 1.0
+    camera_height = 0.75
+    min_depth = 0
+    max_depth = 7.5
     camera_fov = 80.67
     image_width = 640
 
     # kwargs for itm policy
     # name = "ChronoITMPolicy"
     text_prompt = "Seems like there is a target_object ahead."
+    # text_prompt = "Find a target_object"
     use_max_confidence = False
     pointnav_policy_path = "data/pointnav_weights.pth"
     depth_image_shape = (480, 640)
@@ -353,7 +342,7 @@ if __name__ == "__main__":
     exploration_thresh = 0.7
     obstacle_map_area_threshold = 3.5  # in square meters
     min_obstacle_height = 0.1
-    max_obstacle_height = 0.7
+    max_obstacle_height = 0.9
     hole_area_thresh = 100000
     use_vqa = False
     vqa_prompt = "Is this "
@@ -398,7 +387,10 @@ if __name__ == "__main__":
         # Visualize the depth and RGB images
         import matplotlib.pyplot as plt
         # Convert depth and RGB observations to numpy arrays
+        # annotated_depth = torch.flip(obs["depth"], dims=[0, 1]).numpy()
         annotated_depth = obs["depth"].numpy()
+
+        # annotated_depth = torch.flip(annotated_depth, dims=[0, 1]).numpy()e
         rgb_image = obs["rgb"].numpy()
         # Plot the depth and RGB images
         plt.figure(figsize=(15, 5))

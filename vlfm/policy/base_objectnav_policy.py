@@ -205,8 +205,15 @@ class BaseObjectNavPolicy(BasePolicy):
 
         if not self._visualize:
             return policy_info
-
-        annotated_depth = self._observations_cache["object_map_rgbd"][0][1] * 255
+        # Save depth data to CSV
+        depth_data = self._observations_cache["object_map_rgbd"][0][1]
+        # Normalize depth using fixed min/max values and scale to 255
+        # MIN_DEPTH = 0.1
+        # MAX_DEPTH = 7.5
+        # normalized_depth = np.clip(
+        #     (depth_data - MIN_DEPTH) / (MAX_DEPTH - MIN_DEPTH), 0, 1)
+        # annotated_depth = normalized_depth * 255
+        annotated_depth = depth_data * 255
         annotated_depth = cv2.cvtColor(
             annotated_depth.astype(np.uint8), cv2.COLOR_GRAY2RGB)
         if self._object_masks.sum() > 0:
@@ -238,16 +245,16 @@ class BaseObjectNavPolicy(BasePolicy):
             policy_info["obstacle_map"] = obstacle_map_rgb
 
             # Zoom in on a portion of the obstacle map (crop the image)
-            height, width, _ = obstacle_map_rgb.shape
-            cropped_map = obstacle_map_rgb[
-                height // 4: 2 * height // 3,  # Vertical range
-                width // 3: 2 * width // 3    # Horizontal range
-            ]
+            # height, width, _ = obstacle_map_rgb.shape
+            # cropped_map = obstacle_map_rgb[
+            #     height // 4: 2 * height // 3,  # Vertical range
+            #     width // 3: 2 * width // 3    # Horizontal range
+            # ]
 
             # Visualize the zoomed-in obstacle map
             plt.subplot(1, 2, 2)
             plt.title("Obstacle Map (Zoomed In)")
-            plt.imshow(cropped_map)
+            plt.imshow(obstacle_map_rgb)
             plt.axis('off')
 
         # Save the figure to a file with a unique name
@@ -285,15 +292,79 @@ class BaseObjectNavPolicy(BasePolicy):
 
         return detections
 
+    # def _pointnav(self, goal: np.ndarray, stop: bool = False) -> Tensor:
+    #     action = torch.tensor([[goal[0], goal[1]]], dtype=torch.float32)
+    #     return action
+
+    # def _pointnav_navigate(self, goal: np.ndarray, stop: bool = False) -> Tensor:
+    #     if self._called_stop:
+    #         return torch.tensor([[0]], dtype=torch.float32)
+    #     action = torch.tensor([[goal[0], goal[1]]], dtype=torch.float32)
+    #     self._called_stop = True
+    #     return action
+
     def _pointnav(self, goal: np.ndarray, stop: bool = False) -> Tensor:
-        action = torch.tensor([[goal[0], goal[1]]], dtype=torch.float32)
+        step_size: float = 0.1
+        tolerance: float = 0
+        robot_xy = self._observations_cache["robot_xy"]
+        goal_vector = goal - robot_xy  # Vector pointing to the goal
+        distance_to_goal = np.linalg.norm(goal_vector)  # Distance to the goal
+
+        if distance_to_goal <= tolerance:
+            return torch.tensor([[0, 0]], dtype=torch.float32)  # No movement
+
+        # Normalize the goal vector and scale it by the step size
+        direction = goal_vector / distance_to_goal
+        # Avoid overshooting the goal
+        step = direction * min(step_size, distance_to_goal)
+
+        # Update robot's position
+        self._observations_cache["robot_xy"] = robot_xy + step
+
+        action = torch.tensor(
+            [[robot_xy[0] + step[0], robot_xy[1] + step[1]]], dtype=torch.float32)
+
         return action
 
     def _pointnav_navigate(self, goal: np.ndarray, stop: bool = False) -> Tensor:
+        """
+        Navigate the robot towards the goal position, moving it closer on each call.
+
+        Args:
+            goal (np.ndarray): The goal position (x, y).
+            stop (bool): Indicates whether to stop. Default is False.
+            step_size (float): The distance the robot moves toward the goal in each step.
+            tolerance (float): The distance threshold within which the robot stops moving.
+
+        Returns:
+            Tensor: The updated action for the robot.
+        """
         if self._called_stop:
             return torch.tensor([[0]], dtype=torch.float32)
-        action = torch.tensor([[goal[0], goal[1]]], dtype=torch.float32)
-        self._called_stop = True
+
+        step_size: float = 0.1
+        tolerance: float = 1.5
+
+        robot_xy = self._observations_cache["robot_xy"]
+        goal_vector = goal - robot_xy  # Vector pointing to the goal
+        distance_to_goal = np.linalg.norm(goal_vector)  # Distance to the goal
+
+        if distance_to_goal <= tolerance:
+            self._called_stop = True
+            # No movement
+            return torch.tensor([[robot_xy[0], robot_xy[1]]], dtype=torch.float32)
+
+        # Normalize the goal vector and scale it by the step size
+        direction = goal_vector / distance_to_goal
+        # Avoid overshooting the goal
+        step = direction * min(step_size, distance_to_goal)
+
+        # Update robot's position
+        self._observations_cache["robot_xy"] = robot_xy + step
+
+        action = torch.tensor(
+            [[robot_xy[0] + step[0], robot_xy[1] + step[1]]], dtype=torch.float32)
+
         return action
 
     # def _pointnav(self, goal: np.ndarray, stop: bool = False) -> Tensor:

@@ -41,7 +41,9 @@ class ObjectPointCloudMap:
         fy: float,
     ) -> None:
         """Updates the object map with the latest information from the agent."""
-        local_cloud = self._extract_object_cloud(depth_img, object_mask, min_depth, max_depth, fx, fy)
+        print("Updating object map")
+        local_cloud = self._extract_object_cloud(
+            depth_img, object_mask, min_depth, max_depth, fx, fy)
         if len(local_cloud) == 0:
             return
 
@@ -53,14 +55,16 @@ class ObjectPointCloudMap:
         else:
             # Mark all points of local_cloud whose distance from the camera is too far
             # as being out of range
-            within_range = (local_cloud[:, 0] <= max_depth * 0.95) * 1.0  # 5% margin
+            within_range = (local_cloud[:, 0] <=
+                            max_depth * 0.95) * 1.0  # 5% margin
             # All values of 1 in within_range will be considered within range, and all
             # values of 0 will be considered out of range; these 0s need to be
             # assigned with a random number so that they can be identified later.
             within_range = within_range.astype(np.float32)
             within_range[within_range == 0] = np.random.rand()
         global_cloud = transform_points(tf_camera_to_episodic, local_cloud)
-        global_cloud = np.concatenate((global_cloud, within_range[:, None]), axis=1)
+        global_cloud = np.concatenate(
+            (global_cloud, within_range[:, None]), axis=1)
 
         curr_position = tf_camera_to_episodic[:3, 3]
         closest_point = self._get_closest_point(global_cloud, curr_position)
@@ -70,14 +74,16 @@ class ObjectPointCloudMap:
             return
 
         if object_name in self.clouds:
-            self.clouds[object_name] = np.concatenate((self.clouds[object_name], global_cloud), axis=0)
+            self.clouds[object_name] = np.concatenate(
+                (self.clouds[object_name], global_cloud), axis=0)
         else:
             self.clouds[object_name] = global_cloud
 
     def get_best_object(self, target_class: str, curr_position: np.ndarray) -> np.ndarray:
         target_cloud = self.get_target_cloud(target_class)
 
-        closest_point_2d = self._get_closest_point(target_cloud, curr_position)[:2]
+        closest_point_2d = self._get_closest_point(
+            target_cloud, curr_position)[:2]
 
         if self.last_target_coord is None:
             self.last_target_coord = closest_point_2d
@@ -86,7 +92,8 @@ class ObjectPointCloudMap:
             # 1. the closest point is only slightly different
             # 2. the closest point is a little different, but the agent is too far for
             #    the difference to matter much
-            delta_dist = np.linalg.norm(closest_point_2d - self.last_target_coord)
+            delta_dist = np.linalg.norm(
+                closest_point_2d - self.last_target_coord)
             if delta_dist < 0.1:
                 # closest point is only slightly different
                 return self.last_target_coord
@@ -129,7 +136,8 @@ class ObjectPointCloudMap:
                     # Detection was originally within range
                     continue
                 # Remove all points from self.clouds[obj] that have the same range_id
-                self.clouds[obj] = self.clouds[obj][self.clouds[obj][..., -1] != range_id]
+                self.clouds[obj] = self.clouds[obj][self.clouds[obj]
+                                                    [..., -1] != range_id]
 
     def get_target_cloud(self, target_class: str) -> np.ndarray:
         target_cloud = self.clouds[target_class].copy()
@@ -150,12 +158,15 @@ class ObjectPointCloudMap:
         fy: float,
     ) -> np.ndarray:
         final_mask = object_mask * 255
-        final_mask = cv2.erode(final_mask, None, iterations=self._erosion_size)  # type: ignore
+        final_mask = cv2.erode(
+            final_mask, None, iterations=self._erosion_size)  # type: ignore
 
         valid_depth = depth.copy()
-        valid_depth[valid_depth == 0] = 1  # set all holes (0) to just be far (1)
+        # set all holes (0) to just be far (1)
+        valid_depth[valid_depth == 0] = 1
         valid_depth = valid_depth * (max_depth - min_depth) + min_depth
         cloud = get_point_cloud(valid_depth, final_mask, fx, fy)
+
         cloud = get_random_subarray(cloud, 5000)
         if self.use_dbscan:
             cloud = open3d_dbscan_filtering(cloud)
@@ -166,7 +177,8 @@ class ObjectPointCloudMap:
         ndim = curr_position.shape[0]
         if self.use_dbscan:
             # Return the point that is closest to curr_position, which is 2D
-            closest_point = cloud[np.argmin(np.linalg.norm(cloud[:, :ndim] - curr_position, axis=1))]
+            closest_point = cloud[np.argmin(np.linalg.norm(
+                cloud[:, :ndim] - curr_position, axis=1))]
         else:
             # Calculate the Euclidean distance from each point to the reference point
             if ndim == 2:

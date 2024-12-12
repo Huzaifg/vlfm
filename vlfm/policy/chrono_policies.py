@@ -42,7 +42,9 @@ class ChronoMixin:
         self._max_depth = max_depth
         self._camera_fov = camera_fov
         self._image_width = image_width
-        self._fx = self._fy = image_width / (2 * np.tan(camera_fov / 2))
+        # Convert to radians if in degrees
+        camera_fov_rad = np.radians(camera_fov)
+        self._fx = self._fy = image_width / (2 * np.tan(camera_fov_rad / 2))
 
     def act(self, observations, rnn_hidden_states: Any, prev_actions: Any, masks: Tensor, deterministic: bool = False) -> Tuple[Tensor, Any]:
         parent_cls: BaseObjectNavPolicy = super()
