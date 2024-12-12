@@ -76,12 +76,12 @@ class ChronoEnv:
         # terrain.Initialize()
         self.virtual_robot = chrono.ChBodyEasyBox(
             0.5, 0.5, 0.5, 100, True, True, patch_mat)
-        self.virtual_robot.SetPos(chrono.ChVector3d(-1, 1, 0.25))
+        self.virtual_robot.SetPos(chrono.ChVector3d(3, 1, 0.25))
         self.virtual_robot.SetFixed(True)
         self.my_system.Add(self.virtual_robot)
         mmesh = chrono.ChTriangleMeshConnected()
         mmesh.LoadWavefrontMesh(
-            project_root + '/data/chrono_environment/flat_env.obj', False, True)
+            project_root + '/data/chrono_environment/new_flat.obj', False, True)
 
         # scale to a different size
         # mmesh.Transform(chrono.ChVector3d(0, 0, 0), chrono.ChMatrix33d(2))
@@ -174,7 +174,7 @@ class ChronoEnv:
         self.vis.EnableAbsCoordsysDrawing(True)
         self.vis.Initialize()
         self.vis.AddSkyBox()
-        self.vis.AddCamera(chrono.ChVector3d(-2.5, 0, 2.5),
+        self.vis.AddCamera(chrono.ChVector3d(-7, 0, 4.5),
                            chrono.ChVector3d(0, 0, 0))
 
         self.observations = self._get_observations()
