@@ -231,32 +231,6 @@ def open3d_dbscan_filtering(points: np.ndarray, eps: float = 0.2, min_points: in
     return largest_cluster_points
 
 
-def visualize_and_save_point_cloud(point_cloud: np.ndarray, save_path: str) -> None:
-    """Visualizes an array of 3D points and saves the visualization as a PNG image.
-
-    Args:
-        point_cloud (np.ndarray): Array of 3D points with shape (N, 3).
-        save_path (str): Path to save the PNG image.
-    """
-    import matplotlib.pyplot as plt
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection="3d")
-
-    x = point_cloud[:, 0]
-    y = point_cloud[:, 1]
-    z = point_cloud[:, 2]
-
-    ax.scatter(x, y, z, c="b", marker="o")
-
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-    ax.set_zlabel("Z")
-
-    plt.savefig(save_path)
-    plt.close()
-
-
 def get_random_subarray(points: np.ndarray, size: int) -> np.ndarray:
     """
     This function returns a subarray of a given 3D points array. The size of the

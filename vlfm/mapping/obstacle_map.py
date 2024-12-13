@@ -11,6 +11,10 @@ from vlfm.mapping.base_map import BaseMap
 from vlfm.utils.geometry_utils import extract_yaw, get_point_cloud, transform_points
 from vlfm.utils.img_utils import fill_small_holes
 
+import matplotlib.pyplot as plt
+import os
+import time
+
 
 class ObstacleMap(BaseMap):
     """Generates two maps; one representing the area that the robot has explored so far,
@@ -30,7 +34,7 @@ class ObstacleMap(BaseMap):
         area_thresh: float = 3.0,  # square meters
         hole_area_thresh: int = 100000,  # square pixels
         size: int = 1000,
-        pixels_per_meter: int = 20,
+        pixels_per_meter: int = 10,
     ):
         super().__init__(size, pixels_per_meter)
         self.explored_area = np.zeros((size, size), dtype=bool)
@@ -91,9 +95,19 @@ class ObstacleMap(BaseMap):
                 filled_depth = fill_small_holes(depth, self._hole_area_thresh)
             scaled_depth = filled_depth * (max_depth - min_depth) + min_depth
             mask = scaled_depth < max_depth
-            point_cloud_camera_frame = get_point_cloud(scaled_depth, mask, fx, fy)
-            point_cloud_episodic_frame = transform_points(tf_camera_to_episodic, point_cloud_camera_frame)
-            obstacle_cloud = filter_points_by_height(point_cloud_episodic_frame, self._min_height, self._max_height)
+            point_cloud_camera_frame = get_point_cloud(
+                scaled_depth, mask, fx, fy)
+
+            # Plot and save the point cloud
+
+            point_cloud_episodic_frame = transform_points(
+                tf_camera_to_episodic, point_cloud_camera_frame)
+
+            # os.makedirs('tmp_vis', exist_ok=True)
+            # plot_point_cloud(point_cloud_episodic_frame,
+            #                  'tmp_vis/point_cloud.png')
+            obstacle_cloud = filter_points_by_height(
+                point_cloud_episodic_frame, self._min_height, self._max_height)
 
             # Populate topdown map with obstacle locations
             xy_points = obstacle_cloud[:, :2]
@@ -113,7 +127,8 @@ class ObstacleMap(BaseMap):
 
         # Update the explored area
         agent_xy_location = tf_camera_to_episodic[:2, 3]
-        agent_pixel_location = self._xy_to_px(agent_xy_location.reshape(1, 2))[0]
+        agent_pixel_location = self._xy_to_px(
+            agent_xy_location.reshape(1, 2))[0]
         new_explored_area = reveal_fog_of_war(
             top_down_map=self._navigable_map.astype(np.uint8),
             current_fog_of_war_mask=np.zeros_like(self._map, dtype=np.uint8),
@@ -122,7 +137,8 @@ class ObstacleMap(BaseMap):
             fov=np.rad2deg(topdown_fov),
             max_line_len=max_depth * self.pixels_per_meter,
         )
-        new_explored_area = cv2.dilate(new_explored_area, np.ones((3, 3), np.uint8), iterations=1)
+        new_explored_area = cv2.dilate(
+            new_explored_area, np.ones((3, 3), np.uint8), iterations=1)
         self.explored_area[new_explored_area > 0] = 1
         self.explored_area[self._navigable_map == 0] = 0
         contours, _ = cv2.findContours(
@@ -134,7 +150,8 @@ class ObstacleMap(BaseMap):
             min_dist = np.inf
             best_idx = 0
             for idx, cnt in enumerate(contours):
-                dist = cv2.pointPolygonTest(cnt, tuple([int(i) for i in agent_pixel_location]), True)
+                dist = cv2.pointPolygonTest(cnt, tuple(
+                    [int(i) for i in agent_pixel_location]), True)
                 if dist >= 0:
                     best_idx = idx
                     break
@@ -142,7 +159,8 @@ class ObstacleMap(BaseMap):
                     min_dist = abs(dist)
                     best_idx = idx
             new_area = np.zeros_like(self.explored_area, dtype=np.uint8)
-            cv2.drawContours(new_area, contours, best_idx, 1, -1)  # type: ignore
+            cv2.drawContours(new_area, contours, best_idx,
+                             1, -1)  # type: ignore
             self.explored_area = new_area.astype(bool)
 
         # Compute frontier locations
@@ -179,7 +197,8 @@ class ObstacleMap(BaseMap):
         vis_img[self._map == 1] = (0, 0, 0)
         # Draw frontiers in blue (200, 0, 0)
         for frontier in self._frontiers_px:
-            cv2.circle(vis_img, tuple([int(i) for i in frontier]), 5, (200, 0, 0), 2)
+            cv2.circle(vis_img, tuple([int(i)
+                       for i in frontier]), 5, (200, 0, 0), 2)
 
         vis_img = cv2.flip(vis_img, 0)
 
@@ -195,3 +214,20 @@ class ObstacleMap(BaseMap):
 
 def filter_points_by_height(points: np.ndarray, min_height: float, max_height: float) -> np.ndarray:
     return points[(points[:, 2] >= min_height) & (points[:, 2] <= max_height)]
+
+
+def plot_point_cloud(point_cloud: np.ndarray, filename: str) -> None:
+    """Plots the point cloud and saves it as an image."""
+    # Add a timestamp to the filename to make it unique
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    unique_filename = f"{filename}_{timestamp}.png"
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(point_cloud[:, 0], point_cloud[:, 1], point_cloud[:, 2], s=1)
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    plt.title('Point Cloud')
+    plt.savefig(unique_filename)
+    plt.close(fig)

@@ -59,7 +59,7 @@ class ChronoMixin:
 
     def _initialize(self) -> Tensor:
         """Turn left 30 degrees 12 times to get a 360 view at the beginning"""
-        self._done_initializing = not self._num_steps < 11  # type: ignore
+        self._done_initializing = not self._num_steps < 24  # type: ignore
         return TorchActionIDs.TURN_LEFT
 
     def _reset(self) -> None:

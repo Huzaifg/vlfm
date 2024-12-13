@@ -17,7 +17,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
 class ChronoEnv:
-    def __init__(self, target_object: str = "toilet"):
+    def __init__(self, target_object: str = "tv"):
         self.my_system = None
 
         # Output directory
@@ -76,7 +76,7 @@ class ChronoEnv:
         # terrain.Initialize()
         self.virtual_robot = chrono.ChBodyEasyBox(
             0.5, 0.5, 0.5, 100, True, True, patch_mat)
-        self.virtual_robot.SetPos(chrono.ChVector3d(1, 1, 0.25))
+        self.virtual_robot.SetPos(chrono.ChVector3d(4, -3, 0.25))
         self.virtual_robot.SetFixed(True)
         self.my_system.Add(self.virtual_robot)
         mmesh = chrono.ChTriangleMeshConnected()
@@ -113,7 +113,7 @@ class ChronoEnv:
             intensity, intensity, intensity), 500.0, chrono.ChVector3f(1, 0, 0), chrono.ChVector3f(0, -1, 0))
 
         offset_pose = chrono.ChFramed(
-            chrono.ChVector3d(0.0, 0, 0.5), chrono.QUNIT)
+            chrono.ChVector3d(0.3, 0, 0.25), chrono.QUNIT)
 
         self.lidar = sens.ChLidarSensor(
             self.virtual_robot,             # body lidar is attached to
@@ -124,7 +124,7 @@ class ChronoEnv:
             self.fov,                    # horizontal field of view
             chrono.CH_PI/6,         # vertical field of view
             -chrono.CH_PI/6,
-            5,                  # max lidar range
+            3.66,                  # max lidar range
             sens.LidarBeamShape_RECTANGULAR,
             1,          # sample radius
             0,       # divergence angle
@@ -216,12 +216,12 @@ class ChronoEnv:
             depth_data = torch.flip(depth_data, dims=[0, 1])
 
             MIN_DEPTH = 0
-            MAX_DEPTH = 7.5
+            MAX_DEPTH = 5.5
             depth_data = np.clip(
                 (depth_data - MIN_DEPTH) / (MAX_DEPTH - MIN_DEPTH), 0, 1)
 
             # Set pixels to white for depth values greater than MAX_DEPTH
-            depth_data[depth_data > MAX_DEPTH] = 1
+            depth_data[depth_data == 0] = 1  # Set all zero values to 1
         else:
             depth_data = torch.zeros(
                 self.image_height, self.image_width, dtype=torch.float32)
@@ -305,10 +305,10 @@ class ChronoEnv:
                              np.cos(rot_state.z), 0.01*np.sin(rot_state.z), 0))
 
             elif action_id == 2:  # TURN_LEFT
-                robot.SetRot(chrono.QuatFromAngleZ(np.pi/6)*robot.GetRot())
+                robot.SetRot(chrono.QuatFromAngleZ(np.pi/12)*robot.GetRot())
 
             elif action_id == 3:  # TURN_RIGHT
-                robot.SetRot(chrono.QuatFromAngleZ(-np.pi/6)*robot.GetRot())
+                robot.SetRot(chrono.QuatFromAngleZ(-np.pi/12)*robot.GetRot())
 
     def quaternion_to_yaw(self, quaternion):
         # Unpack quaternion
@@ -324,9 +324,9 @@ if __name__ == "__main__":
     obs = env.reset()
 
     # sensor params
-    camera_height = 0.75
+    camera_height = 0.5
     min_depth = 0
-    max_depth = 7.5
+    max_depth = 5.5
     camera_fov = 80.67
     image_width = 640
 
@@ -340,9 +340,9 @@ if __name__ == "__main__":
     pointnav_stop_radius = 0.5
     object_map_erosion_size = 5
     exploration_thresh = 0.7
-    obstacle_map_area_threshold = 3.5  # in square meters
-    min_obstacle_height = 0.1
-    max_obstacle_height = 0.9
+    obstacle_map_area_threshold = 1.5  # in square meters
+    min_obstacle_height = 0.3
+    max_obstacle_height = 0.5
     hole_area_thresh = 100000
     use_vqa = False
     vqa_prompt = "Is this "
