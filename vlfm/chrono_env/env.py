@@ -17,7 +17,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
 class ChronoEnv:
-    def __init__(self, target_object: str = "tv"):
+    def __init__(self, target_object: str = "couch"):
         self.my_system = None
 
         # Output directory
@@ -76,7 +76,7 @@ class ChronoEnv:
         # terrain.Initialize()
         self.virtual_robot = chrono.ChBodyEasyBox(
             0.5, 0.5, 0.5, 100, True, True, patch_mat)
-        self.virtual_robot.SetPos(chrono.ChVector3d(4, -3, 0.25))
+        self.virtual_robot.SetPos(chrono.ChVector3d(-1.25, -1.25, 0.25))
         self.virtual_robot.SetFixed(True)
         self.my_system.Add(self.virtual_robot)
         mmesh = chrono.ChTriangleMeshConnected()
@@ -322,7 +322,8 @@ class ChronoEnv:
 if __name__ == "__main__":
     env = ChronoEnv()
     obs = env.reset()
-
+    # Take fake step
+    # obs, stop = env.step(torch.tensor([[0]]))
     # sensor params
     camera_height = 0.5
     min_depth = 0
