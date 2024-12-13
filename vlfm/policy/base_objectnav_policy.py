@@ -206,6 +206,7 @@ class BaseObjectNavPolicy(BasePolicy):
         if not self._visualize:
             return policy_info
         # Save depth data to CSV
+        rgb_data = self._observations_cache["object_map_rgbd"][0][0]
         depth_data = self._observations_cache["object_map_rgbd"][0][1]
         # Normalize depth using fixed min/max values and scale to 255
         # MIN_DEPTH = 0.1
@@ -230,13 +231,20 @@ class BaseObjectNavPolicy(BasePolicy):
         policy_info["annotated_rgb"] = annotated_rgb
         policy_info["annotated_depth"] = annotated_depth
 
-        # # Visualize the depth map
+        # Visualize the depth map
         import matplotlib.pyplot as plt
         plt.figure(figsize=(16, 8))
-        plt.subplot(1, 2, 1)
+        plt.subplot(1, 3, 1)
+        plt.title("RGB")
+        plt.imshow(rgb_data)
+        plt.axis('off')
+
+
+        plt.subplot(1, 3, 2)
         plt.title("Annotated Depth")
         plt.imshow(annotated_depth)
         plt.axis('off')
+
 
         if self._compute_frontiers:
             obstacle_map_rgb = cv2.cvtColor(
@@ -245,16 +253,16 @@ class BaseObjectNavPolicy(BasePolicy):
             policy_info["obstacle_map"] = obstacle_map_rgb
 
             # Zoom in on a portion of the obstacle map (crop the image)
-            # height, width, _ = obstacle_map_rgb.shape
-            # cropped_map = obstacle_map_rgb[
-            #     height // 4: 2 * height // 3,  # Vertical range
-            #     width // 3: 2 * width // 3    # Horizontal range
-            # ]
+            height, width, _ = obstacle_map_rgb.shape
+            cropped_map = obstacle_map_rgb[
+                height // 4: 2 * height // 3,  # Vertical range
+                width // 3: 2 * width // 3    # Horizontal range
+            ]
 
             # Visualize the zoomed-in obstacle map
-            plt.subplot(1, 2, 2)
+            plt.subplot(1, 3, 3)
             plt.title("Obstacle Map (Zoomed In)")
-            plt.imshow(obstacle_map_rgb)
+            plt.imshow(cropped_map)
             plt.axis('off')
 
         # Save the figure to a file with a unique name
@@ -342,7 +350,7 @@ class BaseObjectNavPolicy(BasePolicy):
         if self._called_stop:
             return torch.tensor([[0]], dtype=torch.float32)
 
-        step_size: float = 0.1
+        step_size: float = 0.2
         tolerance: float = 1.5
 
         robot_xy = self._observations_cache["robot_xy"]

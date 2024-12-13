@@ -17,7 +17,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
 class ChronoEnv:
-    def __init__(self, target_object: str = "couch"):
+    def __init__(self, target_object: str = "tv"):
         self.my_system = None
 
         # Output directory
@@ -30,8 +30,8 @@ class ChronoEnv:
         self.update_rate = 30
 
         # Image width and height
-        self.image_width = 640
-        self.image_height = 480
+        self.image_width = 640 #640 
+        self.image_height = 480 #480
 
         # Camera's horizontal field of view
         self.fov = 1.408
@@ -107,10 +107,13 @@ class ChronoEnv:
         # -----------------
 
         self.manager = sens.ChSensorManager(self.my_system)
-
-        intensity = 1.0
-        self.manager.scene.AddAreaLight(chrono.ChVector3f(0, 0, 4), chrono.ChColor(
-            intensity, intensity, intensity), 500.0, chrono.ChVector3f(1, 0, 0), chrono.ChVector3f(0, -1, 0))
+        intensity_low = 0.01
+        intensity_moderate = 1.0
+        intensity_high = 10.0
+        # self.manager.scene.AddAreaLight(chrono.ChVector3f(0, 0, 4), chrono.ChColor(
+        #     intensity, intensity, intensity), 500.0, chrono.ChVector3f(1, 0, 0), chrono.ChVector3f(0, -1, 0))
+        self.manager.scene.AddAreaLight(chrono.ChVector3f(0, 0, 1), chrono.ChColor(
+            intensity_moderate, intensity_moderate, intensity_moderate), 500.0, chrono.ChVector3f(1, 0, 0), chrono.ChVector3f(0, -1, 0))
 
         offset_pose = chrono.ChFramed(
             chrono.ChVector3d(0.3, 0, 0.25), chrono.QUNIT)
@@ -337,7 +340,7 @@ if __name__ == "__main__":
     # text_prompt = "Find a target_object"
     use_max_confidence = False
     pointnav_policy_path = "data/pointnav_weights.pth"
-    depth_image_shape = (480, 640)
+    depth_image_shape = (480, 640) # (160, 213)
     pointnav_stop_radius = 0.5
     object_map_erosion_size = 5
     exploration_thresh = 0.7
