@@ -14,6 +14,8 @@ from vlfm.policy.utils.acyclic_enforcer import AcyclicEnforcer
 from vlfm.utils.geometry_utils import closest_point_within_threshold
 from vlfm.vlm.blip2itm import BLIP2ITMClient
 from vlfm.vlm.detections import ObjectDetections
+import matplotlib.pyplot as plt
+import time
 
 try:
     from habitat_baselines.common.tensor_dict import TensorDict
@@ -185,6 +187,58 @@ class BaseITMPolicy(BaseObjectNavPolicy):
             self._value_map.visualize(markers, reduce_fn=self._vis_reduce_fn),
             cv2.COLOR_BGR2RGB,
         )
+
+        # # Save the value map as an image
+        # timestamp = time.strftime("%Y%m%d-%H%M%S")
+        # plt.figure(figsize=(8, 8))
+        # plt.title("Value Map")
+        # plt.imshow(policy_info["value_map"])
+        # plt.axis('off')
+        # plt.savefig(f"tmp_vis_3/value_map_visualization_{timestamp}.png")
+        # plt.close()
+
+        plt.figure(figsize=(16, 8))
+        plt.subplot(1, 4, 1)
+        plt.title("RGB")
+        plt.imshow(policy_info["annotated_rgb"])
+        plt.axis('off')
+
+        # depth image
+        plt.subplot(1, 4, 2)
+        plt.title("Annotated Depth")
+        plt.imshow(policy_info["annotated_depth"])
+        plt.axis('off')
+
+        # Visualize the zoomed-in obstacle map
+        obstacle_map_rgb = policy_info["obstacle_map"]
+        # Zoom in on a portion of the obstacle map (crop the image)
+        height, width, _ = obstacle_map_rgb.shape
+        cropped_map = obstacle_map_rgb[
+            height // 4: 2 * height // 3,  # Vertical range
+            width // 3: 2 * width // 3    # Horizontal range
+        ]
+
+        plt.subplot(1, 4, 3)
+        plt.title("Obstacle Map (Zoomed In)")
+        plt.imshow(cropped_map)
+        plt.axis('off')
+
+        # value map
+        value_map = policy_info["value_map"]
+        height, width, _ = value_map.shape
+        cropped_value_map = value_map[
+            height // 4: 2 * height // 3,  # Vertical range
+            width // 3: 2 * width // 3    # Horizontal range
+        ]
+        plt.subplot(1, 4, 4)
+        plt.title("value Map")
+        plt.imshow(cropped_value_map)
+        plt.axis('off')
+
+        # Save the figure to a file with a unique name
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        plt.savefig(f"tmp_vis/policy_info_visualization_{timestamp}.png")
+        plt.close()
 
         return policy_info
 

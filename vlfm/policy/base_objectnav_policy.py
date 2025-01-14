@@ -232,19 +232,19 @@ class BaseObjectNavPolicy(BasePolicy):
         policy_info["annotated_depth"] = annotated_depth
 
         # Visualize the depth map
-        import matplotlib.pyplot as plt
-        plt.figure(figsize=(16, 8))
-        plt.subplot(1, 3, 1)
-        plt.title("RGB")
-        plt.imshow(rgb_data)
-        plt.axis('off')
+        # import matplotlib.pyplot as plt
+        # plt.figure(figsize=(16, 8))
+        # plt.subplot(1, 3, 1)
+        # plt.title("RGB")
+        # plt.imshow(rgb_data)
+        # plt.axis('off')
 
 
-        plt.subplot(1, 3, 2)
-        plt.title("Annotated Depth")
-        plt.imshow(annotated_depth)
-        plt.axis('off')
-
+        # plt.subplot(1, 3, 2)
+        # plt.title("Annotated Depth")
+        # plt.imshow(annotated_depth)
+        # plt.axis('off')
+        
 
         if self._compute_frontiers:
             obstacle_map_rgb = cv2.cvtColor(
@@ -259,16 +259,16 @@ class BaseObjectNavPolicy(BasePolicy):
                 width // 3: 2 * width // 3    # Horizontal range
             ]
 
-            # Visualize the zoomed-in obstacle map
-            plt.subplot(1, 3, 3)
-            plt.title("Obstacle Map (Zoomed In)")
-            plt.imshow(cropped_map)
-            plt.axis('off')
+        #     # Visualize the zoomed-in obstacle map
+        #     plt.subplot(1, 3, 3)
+        #     plt.title("Obstacle Map (Zoomed In)")
+        #     plt.imshow(cropped_map)
+        #     plt.axis('off')
 
-        # Save the figure to a file with a unique name
-        timestamp = time.strftime("%Y%m%d-%H%M%S")
-        plt.savefig(f"tmp_vis/policy_info_visualization_{timestamp}.png")
-        plt.close()
+        # # Save the figure to a file with a unique name
+        # timestamp = time.strftime("%Y%m%d-%H%M%S")
+        # plt.savefig(f"tmp_vis/policy_info_visualization_{timestamp}.png")
+        # plt.close()
 
         if "DEBUG_INFO" in os.environ:
             policy_info["render_below_images"].append("debug")
