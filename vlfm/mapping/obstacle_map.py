@@ -124,7 +124,7 @@ class ObstacleMap(BaseMap):
 
         if not explore:
             return
-
+            
         # Update the explored area
         agent_xy_location = tf_camera_to_episodic[:2, 3]
         agent_pixel_location = self._xy_to_px(

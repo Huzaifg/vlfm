@@ -326,12 +326,12 @@ if __name__ == "__main__":
     env = ChronoEnv()
     obs = env.reset()
     # Take fake step
-    # obs, stop = env.step(torch.tensor([[0]]))
+    # obs, stop = env.step(torch.tensor([[0]])) 
     # sensor params
     camera_height = 0.5
     min_depth = 0
     max_depth = 5.5
-    camera_fov = 80.67
+    camera_fov = 1.408 # in deg 80.67
     image_width = 640
 
     # kwargs for itm policy
@@ -354,7 +354,7 @@ if __name__ == "__main__":
     non_coco_threshold = 0.4
     agent_radius = 0.10
 
-    vlfm_policy = vlfm.policy.chrono_policies.ChronoITMPolicy(
+    vlfm_policy = vlfm.policy.chrono_policies.ChronoITMPolicyV2(
         camera_height=camera_height,
         min_depth=min_depth,
         max_depth=max_depth,
@@ -381,6 +381,7 @@ if __name__ == "__main__":
     control_timestep = 0.1
     time_count = 0
     masks = torch.zeros(1, 1)
+    obs, stop = env.step(torch.tensor([[5]], dtype=torch.long))
     while time_count < end_time:
         action, _ = vlfm_policy.act(obs, None, None, masks)
         masks = torch.ones(1, 1)
