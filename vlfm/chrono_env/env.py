@@ -331,7 +331,7 @@ if __name__ == "__main__":
     camera_height = 0.5
     min_depth = 0
     max_depth = 5.5
-    camera_fov = 1.408 # in deg 80.67
+    camera_fov = 80.67 #1.408 # in deg 80.67
     image_width = 640
 
     # kwargs for itm policy

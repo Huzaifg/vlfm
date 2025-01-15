@@ -40,7 +40,7 @@ class ChronoMixin:
         self._camera_height = camera_height
         self._min_depth = min_depth
         self._max_depth = max_depth
-        self._camera_fov = camera_fov
+        self._camera_fov = np.deg2rad(camera_fov)
         self._image_width = image_width
         # Convert to radians if in degrees
         camera_fov_rad = np.radians(camera_fov)
