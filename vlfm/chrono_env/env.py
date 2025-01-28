@@ -17,7 +17,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
 class ChronoEnv:
-    def __init__(self, target_object: str = "tv"):
+    def __init__(self, target_object: str = "toilet"):
         self.my_system = None
 
         # Output directory
@@ -30,8 +30,8 @@ class ChronoEnv:
         self.update_rate = 30
 
         # Image width and height
-        self.image_width = 640 #640 
-        self.image_height = 480 #480
+        self.image_width = 640 #213  (160, 213)
+        self.image_height = 480 #160
 
         # Camera's horizontal field of view
         self.fov = 1.408
@@ -75,7 +75,7 @@ class ChronoEnv:
         # patch.SetColor(chrono.ChColor(0.0, 0.0, 0.0))
         # terrain.Initialize()
         self.virtual_robot = chrono.ChBodyEasyBox(
-            0.5, 0.5, 0.5, 100, True, True, patch_mat)
+            0.25, 0.25, 0.5, 100, True, True, patch_mat)
         self.virtual_robot.SetPos(chrono.ChVector3d(-1.25, -1.25, 0.25))
         self.virtual_robot.SetFixed(True)
         self.my_system.Add(self.virtual_robot)
@@ -109,7 +109,7 @@ class ChronoEnv:
         self.manager = sens.ChSensorManager(self.my_system)
         intensity_low = 0.01
         intensity_moderate = 1.0
-        intensity_high = 10.0
+        intensity_high = 50.0
         # self.manager.scene.AddAreaLight(chrono.ChVector3f(0, 0, 4), chrono.ChColor(
         #     intensity, intensity, intensity), 500.0, chrono.ChVector3f(1, 0, 0), chrono.ChVector3f(0, -1, 0))
         self.manager.scene.AddAreaLight(chrono.ChVector3f(0, 0, 1), chrono.ChColor(
@@ -332,7 +332,7 @@ if __name__ == "__main__":
     min_depth = 0
     max_depth = 5.5
     camera_fov = 80.67 #1.408 # in deg 80.67
-    image_width = 640
+    image_width = 640 #213
 
     # kwargs for itm policy
     # name = "ChronoITMPolicy"
@@ -352,7 +352,7 @@ if __name__ == "__main__":
     vqa_prompt = "Is this "
     coco_threshold = 0.8
     non_coco_threshold = 0.4
-    agent_radius = 0.10
+    agent_radius = 0.15
 
     vlfm_policy = vlfm.policy.chrono_policies.ChronoITMPolicyV2(
         camera_height=camera_height,

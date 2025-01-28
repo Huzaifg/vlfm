@@ -213,25 +213,30 @@ class BaseITMPolicy(BaseObjectNavPolicy):
         obstacle_map_rgb = policy_info["obstacle_map"]
         # Zoom in on a portion of the obstacle map (crop the image)
         height, width, _ = obstacle_map_rgb.shape
+        # Define a smaller cropping range to zoom in further on the center
         cropped_map = obstacle_map_rgb[
-            height // 4: 2 * height // 3,  # Vertical range
-            width // 3: 2 * width // 3    # Horizontal range
+            height // 2 - height // 5: height // 2 + height // 5,  # Center vertical range
+            width // 2 - width // 5: width // 2 + width // 5       # Center horizontal range
         ]
 
         plt.subplot(1, 4, 3)
-        plt.title("Obstacle Map (Zoomed In)")
+        plt.title("Obstacle Map")
         plt.imshow(cropped_map)
         plt.axis('off')
 
         # value map
         value_map = policy_info["value_map"]
         height, width, _ = value_map.shape
+        # cropped_value_map = value_map[
+        #     height // 4: 2 * height // 3,  # Vertical range
+        #     width // 3: 2 * width // 3    # Horizontal range
+        # ]
         cropped_value_map = value_map[
-            height // 4: 2 * height // 3,  # Vertical range
-            width // 3: 2 * width // 3    # Horizontal range
+            height // 2 - height // 5: height // 2 + height // 5,  # Center vertical range
+            width // 2 - width // 5: width // 2 + width // 5       # Center horizontal range
         ]
         plt.subplot(1, 4, 4)
-        plt.title("value Map")
+        plt.title("Value Map")
         plt.imshow(cropped_value_map)
         plt.axis('off')
 
