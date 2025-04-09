@@ -120,7 +120,7 @@ class ChronoEnv:
 
         self.lidar = sens.ChLidarSensor(
             self.virtual_robot,             # body lidar is attached to
-            20,                     # scanning rate in Hz
+            30,   # was previously 20                    # scanning rate in Hz
             offset_pose,            # offset pose
             self.image_width,                   # number of horizontal samples
             self.image_height,                    # number of vertical channels
