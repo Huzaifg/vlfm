@@ -188,15 +188,6 @@ class BaseITMPolicy(BaseObjectNavPolicy):
             cv2.COLOR_BGR2RGB,
         )
 
-        # # Save the value map as an image
-        # timestamp = time.strftime("%Y%m%d-%H%M%S")
-        # plt.figure(figsize=(8, 8))
-        # plt.title("Value Map")
-        # plt.imshow(policy_info["value_map"])
-        # plt.axis('off')
-        # plt.savefig(f"tmp_vis_3/value_map_visualization_{timestamp}.png")
-        # plt.close()
-
         plt.figure(figsize=(16, 8))
         plt.subplot(1, 4, 1)
         plt.title("RGB")

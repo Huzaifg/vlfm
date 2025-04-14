@@ -37,7 +37,10 @@ class ChronoMixin(BaseObjectNavPolicy):
     def __init__(self, camera_height: float, min_depth: float, max_depth: float,
                  camera_fov: float, image_width: int, shared_map: ObstacleMap, *args: Any, **kwargs: Any) -> None:
         # Pass any extra arguments to the parent.
-        super().__init__(*args, **kwargs)
+        # super().__init__(*args, **kwargs)
+        kwargs.setdefault("shared_map", shared_map)
+        super().__init__(camera_height=camera_height, min_depth=min_depth, max_depth=max_depth,
+                         camera_fov=camera_fov, image_width=image_width, *args, **kwargs)
         self.shared_map = shared_map  # Shared obstacle and value map instance
         self._camera_height = camera_height
         self._min_depth = min_depth

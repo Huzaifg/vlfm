@@ -257,9 +257,9 @@ if __name__ == "__main__":
     from vlfm.policy.chrono_policies_multiple import ChronoITMPolicyV2
 
     # Define parameters as in your single-agent implementation.
-    min_obstacle_height = 0.61
-    max_obstacle_height = 0.88
-    agent_radius = 0.18
+    min_obstacle_height = 0.3
+    max_obstacle_height = 0.5
+    agent_radius = 0.15
     obstacle_map_area_threshold = 1.5
     hole_area_thresh = 100000
 
@@ -271,6 +271,7 @@ if __name__ == "__main__":
         agent_radius=agent_radius,
         hole_area_thresh=hole_area_thresh,
     )
+
 
     # Instantiate a single policy instance.
     camera_height = 0.5
@@ -310,7 +311,7 @@ if __name__ == "__main__":
     )
 
     # Create the Chrono environment with one agent by passing num_agents=1.
-    env = ChronoEnvMulti(target_object="toilet", num_agents=1)
+    env = ChronoEnvMulti(target_object=TARGET_OBJECT, num_agents=1)
     observations = env.reset()
 
     # Optionally, initialize a dummy mask.

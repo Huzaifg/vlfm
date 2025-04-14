@@ -2,7 +2,7 @@
 
 import os
 from dataclasses import dataclass, fields
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union, Optional
 
 import cv2
 import numpy as np
@@ -58,6 +58,7 @@ class BaseObjectNavPolicy(BasePolicy):
         vqa_prompt: str = "Is this ",
         coco_threshold: float = 0.8,
         non_coco_threshold: float = 0.4,
+        shared_map: Optional[ObstacleMap] = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -89,13 +90,25 @@ class BaseObjectNavPolicy(BasePolicy):
         self._called_stop = False
         self._compute_frontiers = compute_frontiers
         if compute_frontiers:
-            self._obstacle_map = ObstacleMap(
-                min_height=min_obstacle_height,
-                max_height=max_obstacle_height,
-                area_thresh=obstacle_map_area_threshold,
-                agent_radius=agent_radius,
-                hole_area_thresh=hole_area_thresh,
-            )
+            # Only create a new map if a shared one wasn't provided.
+            if shared_map is not None:
+                print("using shared obstacle map")
+                self._obstacle_map = shared_map
+            else:
+                print("obstacle map being created")
+                print(f"min_obstacle_height: {min_obstacle_height}")
+                print(f"max_obstacle_height: {max_obstacle_height}")
+                print(
+                    f"obstacle_map_area_threshold: {obstacle_map_area_threshold}")
+                print(f"agent_radius: {agent_radius}")
+                print(f"hole_area_thresh: {hole_area_thresh}")
+                self._obstacle_map = ObstacleMap(
+                    min_height=min_obstacle_height,
+                    max_height=max_obstacle_height,
+                    area_thresh=obstacle_map_area_threshold,
+                    agent_radius=agent_radius,
+                    hole_area_thresh=hole_area_thresh,
+                )
 
     def _reset(self) -> None:
         self._target_object = ""
