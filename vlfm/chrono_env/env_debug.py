@@ -79,6 +79,67 @@ class ChronoEnv:
         self.virtual_robot.SetPos(chrono.ChVector3d(-1.25, -1.25, 0.25))
         self.virtual_robot.SetFixed(True)
         self.my_system.Add(self.virtual_robot)
+
+        # # sensor manager
+        # self.manager = sens.ChSensorManager(self.my_system)
+
+
+        # # Define a common sensor offset.
+        # offset_pose = chrono.ChFramed(chrono.ChVector3d(0.3, 0, 0.25), chrono.QUNIT)
+
+        # # Create and add a lidar sensor.
+        # self.lidar = sens.ChLidarSensor(
+        #     self.virtual_robot,              # attach to this robot
+        #     30,                 # scanning rate in Hz
+        #     offset_pose,
+        #     self.image_width,   # horizontal samples
+        #     self.image_height,  # vertical channels
+        #     self.fov,           # horizontal FOV
+        #     chrono.CH_PI/6,     # vertical FOV upper bound
+        #     -chrono.CH_PI/6,    # vertical FOV lower bound
+        #     3.66,               # maximum lidar range
+        #     sens.LidarBeamShape_RECTANGULAR,
+        #     1,                  # sample radius
+        #     0, 0,               # divergence angles
+        #     sens.LidarReturnMode_STRONGEST_RETURN
+        # )
+        # self.lidar.SetName("Lidar Sensor")
+        # self.lidar.SetLag(0)
+        # self.lidar.SetCollectionWindow(1/20)
+        # self.lidar.PushFilter(sens.ChFilterVisualize(self.image_width, self.image_height, "depth camera"))
+        # self.lidar.PushFilter(sens.ChFilterDIAccess())
+        # self.manager.AddSensor(self.lidar)
+        # # self.lidar_list.append(self.lidar)
+
+        # # Create and add a camera sensor.
+        # self.cam = sens.ChCameraSensor(
+        #     self.virtual_robot,
+        #     self.update_rate,
+        #     offset_pose,
+        #     self.image_width,
+        #     self.image_height,
+        #     self.fov
+        # )
+        # self.cam.SetName("Camera Sensor")
+        # self.cam.SetLag(self.lag)
+        # self.cam.SetCollectionWindow(self.exposure_time)
+        # self.cam.PushFilter(sens.ChFilterVisualize(self.image_width, self.image_height, "rgb camera"))
+        # self.cam.PushFilter(sens.ChFilterRGBA8Access())
+        # self.manager.AddSensor(self.cam)
+        # # self.cam_list.append(self.cam)
+
+
+
+
+
+
+
+
+
+
+
+
+
         mmesh = chrono.ChTriangleMeshConnected()
         mmesh.LoadWavefrontMesh(
             project_root + '/data/chrono_environment/new_flat_3.obj', False, True)
@@ -100,67 +161,121 @@ class ChronoEnv:
 
         # ---------------------------------------
 
-        # Add camera sensor
+        # # Add camera sensor
 
-        # -----------------
-        # Camera parameters
-        # -----------------
+        # # -----------------
+        # # Camera parameters
+        # # -----------------
 
+        # self.manager = sens.ChSensorManager(self.my_system)
+        # intensity_low = 0.01
+        # intensity_moderate = 1.0
+        # intensity_high = 50.0
+        # # self.manager.scene.AddAreaLight(chrono.ChVector3f(0, 0, 4), chrono.ChColor(
+        # #     intensity, intensity, intensity), 500.0, chrono.ChVector3f(1, 0, 0), chrono.ChVector3f(0, -1, 0))
+        # self.manager.scene.AddAreaLight(chrono.ChVector3f(0, 0, 1), chrono.ChColor(
+        #     intensity_moderate, intensity_moderate, intensity_moderate), 500.0, chrono.ChVector3f(1, 0, 0), chrono.ChVector3f(0, -1, 0))
+
+        # offset_pose = chrono.ChFramed(
+        #     chrono.ChVector3d(0.3, 0, 0.25), chrono.QUNIT)
+
+        # self.lidar = sens.ChLidarSensor(
+        #     self.virtual_robot,             # body lidar is attached to
+        #     30,   # was previously 20                    # scanning rate in Hz
+        #     offset_pose,            # offset pose
+        #     self.image_width,                   # number of horizontal samples
+        #     self.image_height,                    # number of vertical channels
+        #     self.fov,                    # horizontal field of view
+        #     chrono.CH_PI/6,         # vertical field of view
+        #     -chrono.CH_PI/6,
+        #     3.66,                  # max lidar range
+        #     sens.LidarBeamShape_RECTANGULAR,
+        #     1,          # sample radius
+        #     0,       # divergence angle
+        #     0,       # divergence angle
+        #     sens.LidarReturnMode_STRONGEST_RETURN)
+
+        # self.lidar.SetName("Lidar Sensor")
+        # self.lidar.SetLag(0)
+        # self.lidar.SetCollectionWindow(1/20)
+        # self.lidar.PushFilter(sens.ChFilterVisualize(
+        #     self.image_width, self.image_height, "depth camera"))
+        # self.lidar.PushFilter(sens.ChFilterDIAccess())
+        # self.manager.AddSensor(self.lidar)
+
+        # self.cam = sens.ChCameraSensor(
+        #     self.virtual_robot,              # body camera is attached to
+        #     self.update_rate,            # update rate in Hz
+        #     offset_pose,            # offset pose
+        #     self.image_width,            # image width
+        #     self.image_height,           # image height
+        #     self.fov                    # camera's horizontal field of view
+        # )
+
+        # self.cam.SetName("Camera Sensor")
+        # self.cam.SetLag(self.lag)
+        # self.cam.SetCollectionWindow(self.exposure_time)
+        # self.cam.PushFilter(sens.ChFilterVisualize(
+        #     self.image_width, self.image_height, "rgb camera"))
+        # # Provides the host access to this RGBA8 buffer
+        # self.cam.PushFilter(sens.ChFilterRGBA8Access())
+
+        # # add sensor to manager
+        # self.manager.AddSensor(self.cam)
+
+        # ---------------------------------------
+
+        # sensor manager
         self.manager = sens.ChSensorManager(self.my_system)
-        intensity_low = 0.01
         intensity_moderate = 1.0
-        intensity_high = 50.0
-        # self.manager.scene.AddAreaLight(chrono.ChVector3f(0, 0, 4), chrono.ChColor(
-        #     intensity, intensity, intensity), 500.0, chrono.ChVector3f(1, 0, 0), chrono.ChVector3f(0, -1, 0))
         self.manager.scene.AddAreaLight(chrono.ChVector3f(0, 0, 1), chrono.ChColor(
             intensity_moderate, intensity_moderate, intensity_moderate), 500.0, chrono.ChVector3f(1, 0, 0), chrono.ChVector3f(0, -1, 0))
 
-        offset_pose = chrono.ChFramed(
-            chrono.ChVector3d(0.3, 0, 0.25), chrono.QUNIT)
 
+        # Define a common sensor offset.
+        offset_pose = chrono.ChFramed(chrono.ChVector3d(0.3, 0, 0.25), chrono.QUNIT)
+
+        # Create and add a lidar sensor.
         self.lidar = sens.ChLidarSensor(
-            self.virtual_robot,             # body lidar is attached to
-            30,   # was previously 20                    # scanning rate in Hz
-            offset_pose,            # offset pose
-            self.image_width,                   # number of horizontal samples
-            self.image_height,                    # number of vertical channels
-            self.fov,                    # horizontal field of view
-            chrono.CH_PI/6,         # vertical field of view
-            -chrono.CH_PI/6,
-            3.66,                  # max lidar range
+            self.virtual_robot,              # attach to this robot
+            30,                 # scanning rate in Hz
+            offset_pose,
+            self.image_width,   # horizontal samples
+            self.image_height,  # vertical channels
+            self.fov,           # horizontal FOV
+            chrono.CH_PI/6,     # vertical FOV upper bound
+            -chrono.CH_PI/6,    # vertical FOV lower bound
+            3.66,               # maximum lidar range
             sens.LidarBeamShape_RECTANGULAR,
-            1,          # sample radius
-            0,       # divergence angle
-            0,       # divergence angle
-            sens.LidarReturnMode_STRONGEST_RETURN)
-
+            1,                  # sample radius
+            0, 0,               # divergence angles
+            sens.LidarReturnMode_STRONGEST_RETURN
+        )
         self.lidar.SetName("Lidar Sensor")
         self.lidar.SetLag(0)
         self.lidar.SetCollectionWindow(1/20)
-        self.lidar.PushFilter(sens.ChFilterVisualize(
-            self.image_width, self.image_height, "depth camera"))
+        self.lidar.PushFilter(sens.ChFilterVisualize(self.image_width, self.image_height, "depth camera"))
         self.lidar.PushFilter(sens.ChFilterDIAccess())
         self.manager.AddSensor(self.lidar)
+        # self.lidar_list.append(self.lidar)
 
+        # Create and add a camera sensor.
         self.cam = sens.ChCameraSensor(
-            self.virtual_robot,              # body camera is attached to
-            self.update_rate,            # update rate in Hz
-            offset_pose,            # offset pose
-            self.image_width,            # image width
-            self.image_height,           # image height
-            self.fov                    # camera's horizontal field of view
+            self.virtual_robot,
+            self.update_rate,
+            offset_pose,
+            self.image_width,
+            self.image_height,
+            self.fov
         )
-
         self.cam.SetName("Camera Sensor")
         self.cam.SetLag(self.lag)
         self.cam.SetCollectionWindow(self.exposure_time)
-        self.cam.PushFilter(sens.ChFilterVisualize(
-            self.image_width, self.image_height, "rgb camera"))
-        # Provides the host access to this RGBA8 buffer
+        self.cam.PushFilter(sens.ChFilterVisualize(self.image_width, self.image_height, "rgb camera"))
         self.cam.PushFilter(sens.ChFilterRGBA8Access())
-
-        # add sensor to manager
         self.manager.AddSensor(self.cam)
+        # self.cam_list.append(self.cam)
+
 
         # ---------------------------------------
 
