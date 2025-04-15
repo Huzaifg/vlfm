@@ -1,7 +1,7 @@
 # Copyright (c) 2023 Boston Dynamics AI Institute LLC. All rights reserved.
 
 import os
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union, Optional
 
 import cv2
 import numpy as np
@@ -43,17 +43,38 @@ class BaseITMPolicy(BaseObjectNavPolicy):
         text_prompt: str,
         use_max_confidence: bool = True,
         sync_explored_areas: bool = False,
+        shared_value_map: Optional[ValueMap] = None,
         *args: Any,
         **kwargs: Any,
     ):
         super().__init__(*args, **kwargs)
         self._itm = BLIP2ITMClient(port=int(os.environ.get("BLIP2ITM_PORT", "12182")))
         self._text_prompt = text_prompt
-        self._value_map: ValueMap = ValueMap(
-            value_channels=len(text_prompt.split(PROMPT_SEPARATOR)),
-            use_max_confidence=use_max_confidence,
-            obstacle_map=self._obstacle_map if sync_explored_areas else None,
-        )
+        
+
+        # Use the provided shared_value_map, or else create a new one.
+        if shared_value_map is not None:
+            print("using shared value map")
+            self._value_map = shared_value_map
+        else:
+            print("creating new value map")
+            self._value_map = ValueMap(
+                value_channels=len(text_prompt.split(PROMPT_SEPARATOR)),
+                use_max_confidence=use_max_confidence,
+                obstacle_map=self._obstacle_map if sync_explored_areas else None,
+            )
+
+        # print(f"value_channels: {len(text_prompt.split(PROMPT_SEPARATOR))}")
+        # print(f"use_max_confidence: {use_max_confidence}")
+        # print(f"sync_explored_areas: {sync_explored_areas}")
+
+        # self._value_map: ValueMap = ValueMap(
+        #     value_channels=len(text_prompt.split(PROMPT_SEPARATOR)),
+        #     use_max_confidence=use_max_confidence,
+        #     obstacle_map=self._obstacle_map if sync_explored_areas else None,
+        # )
+
+
         self._acyclic_enforcer = AcyclicEnforcer()
 
     def _reset(self) -> None:

@@ -256,6 +256,8 @@ if __name__ == "__main__":
 
     # Create the shared obstacle map with all required parameters.
     from vlfm.mapping.obstacle_map import ObstacleMap
+    from vlfm.mapping.value_map import ValueMap
+
 
     shared_map = ObstacleMap(
         min_height=min_obstacle_height,
@@ -263,6 +265,14 @@ if __name__ == "__main__":
         area_thresh=obstacle_map_area_threshold,
         agent_radius=agent_radius,
         hole_area_thresh=hole_area_thresh,
+    )
+
+    # Create a shared value map. Choose your desired parameters.
+    # Here, for instance, we set value_channels to 1. Adjust as needed.
+    shared_value_map = ValueMap(
+        value_channels=1,  # or use len(text_prompt.split(PROMPT_SEPARATOR)) if that makes sense
+        use_max_confidence=False,
+        obstacle_map=None  # optionally, link the obstacle map for fusion
     )
 
     policy = vlfm.policy.chrono_policies_multiple.ChronoITMPolicyV2(
@@ -286,7 +296,8 @@ if __name__ == "__main__":
         coco_threshold=coco_threshold,
         non_coco_threshold=non_coco_threshold,
         agent_radius=agent_radius,
-        shared_map = shared_map
+        shared_map = shared_map,
+        shared_value_map=shared_value_map
     )
 
     end_time = 10
