@@ -1,103 +1,86 @@
+# this one sort of works but takes a different path than the original when navigating to the bathroom
+
 import time
+import vlfm.policy.chrono_policies_multiple
 import math
 import numpy as np
-import torch
-import sys
-import os
-
-import pychrono as chrono
 import pychrono.sensor as sens
 import pychrono.irrlicht as chronoirr
-
-# Set up project paths
+import pychrono as chrono
+import sys
+import os
+import torch
+# Assuming the script is located in the 'experiments/apartment' directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, '../../'))
 sys.path.append(project_root)
+# Add the parent directory of 'models' to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-TARGET_OBJECT = "toilet"
-
-class ChronoEnvMulti:
-    def __init__(self, target_object: str = TARGET_OBJECT, num_agents: int = 1):
-        # Allow choosing the number of agents for debugging.
+class ChronoEnv:
+    def __init__(self, target_object: str = "toilet", num_agents: int = 1):
         self.num_agents = num_agents
-
-        # Output directory for sensor outputs (if needed)
+        self.my_system = None
         self.out_dir = "SENSOR_OUTPUT/"
         self.lens_model = sens.PINHOLE
-
-        # Simulation settings
-        self.update_rate = 30  # Hz
+        self.update_rate = 30
         self.image_width = 640
         self.image_height = 480
-        self.fov = 1.408  # horizontal field of view in radians
+        self.fov = 1.408
         self.lag = 0
         self.exposure_time = 0
-
-        # Physics simulation timestep & control frequency
+        self.manager = None
+        self.vis = None
+        self.rt_timer = None
         self.timestep = 0.001
         self.control_frequency = 10
         self.steps_per_control = round(1 / (self.timestep * self.control_frequency))
         self.step_number = 0
         self.render_frame = 0
-
-        self.target_object = target_object
-
-        # Holders for multiple agents and their sensors
-        self.virtual_robots = []   # list of chrono bodies for agents
-        self.lidar_list = []       # lidar sensors for each agent
-        self.cam_list = []         # camera sensors for each agent
-
-        self.manager = None  # A single sensor manager for all agents
-        self.vis = None      # Shared visual system for the simulation
         self.observations = None
+        self.target_object = target_object
+        self.virtual_robots = []
+        self.lidar_list = []
+        self.cam_list = []
 
     def reset(self):
-        # Create the Chrono simulation system.
         self.my_system = chrono.ChSystemSMC()
         self.my_system.SetCollisionSystemType(chrono.ChCollisionSystem.Type_BULLET)
-
         patch_mat = chrono.ChContactMaterialSMC()
 
-        # Instead of hard-coding two positions, we choose based on self.num_agents.
-        # For testing with one agent, you might choose a single fixed starting point.
         if self.num_agents == 1:
             start_positions = [chrono.ChVector3d(-1.25, -1.25, 0.25)]
         else:
-            # If more than one agent is desired, use some predefined positions.
             start_positions = [
                 chrono.ChVector3d(-1.25, -1.25, 0.25),
                 chrono.ChVector3d(1.25, 1.25, 0.25),
             ]
-            # You could extend this list if needed.
 
-        # Create a single sensor manager for all sensors.
         self.manager = sens.ChSensorManager(self.my_system)
-        
+        intensity_moderate = 1.0
+        self.manager.scene.AddAreaLight(chrono.ChVector3f(0, 0, 1), chrono.ChColor(intensity_moderate, intensity_moderate, intensity_moderate), 500.0, chrono.ChVector3f(1, 0, 0), chrono.ChVector3f(0, -1, 0))
+
         for pos in start_positions:
             robot = chrono.ChBodyEasyBox(0.25, 0.25, 0.5, 100, True, True, patch_mat)
             robot.SetPos(pos)
             robot.SetFixed(True)
             self.my_system.Add(robot)
             self.virtual_robots.append(robot)
-
-            # Define a common sensor offset.
             offset_pose = chrono.ChFramed(chrono.ChVector3d(0.3, 0, 0.25), chrono.QUNIT)
 
-            # Create and add a lidar sensor.
             lidar = sens.ChLidarSensor(
-                robot,              # attach to this robot
-                30,                 # scanning rate in Hz
+                robot,
+                30,
                 offset_pose,
-                self.image_width,   # horizontal samples
-                self.image_height,  # vertical channels
-                self.fov,           # horizontal FOV
-                chrono.CH_PI/6,     # vertical FOV upper bound
-                -chrono.CH_PI/6,    # vertical FOV lower bound
-                3.66,               # maximum lidar range
+                self.image_width,
+                self.image_height,
+                self.fov,
+                chrono.CH_PI/6,
+                -chrono.CH_PI/6,
+                3.66,
                 sens.LidarBeamShape_RECTANGULAR,
-                1,                  # sample radius
-                0, 0,               # divergence angles
+                1,
+                0, 0,
                 sens.LidarReturnMode_STRONGEST_RETURN
             )
             lidar.SetName("Lidar Sensor")
@@ -108,7 +91,6 @@ class ChronoEnvMulti:
             self.manager.AddSensor(lidar)
             self.lidar_list.append(lidar)
 
-            # Create and add a camera sensor.
             cam = sens.ChCameraSensor(
                 robot,
                 self.update_rate,
@@ -125,11 +107,8 @@ class ChronoEnvMulti:
             self.manager.AddSensor(cam)
             self.cam_list.append(cam)
 
-        # Load the static environment mesh.
         mmesh = chrono.ChTriangleMeshConnected()
-        mesh_path = os.path.join(project_root, "data/chrono_environment/new_flat_3.obj")
-        mmesh.LoadWavefrontMesh(mesh_path, False, True)
-
+        mmesh.LoadWavefrontMesh(project_root + '/data/chrono_environment/new_flat_3.obj', False, True)
         trimesh_shape = chrono.ChVisualShapeTriangleMesh()
         trimesh_shape.SetMesh(mmesh)
         trimesh_shape.SetName("ENV MESH")
@@ -141,19 +120,13 @@ class ChronoEnvMulti:
         mesh_body.SetFixed(True)
         self.my_system.Add(mesh_body)
 
-        # Initialize the visualization system.
         self.vis = chronoirr.ChVisualSystemIrrlicht(self.my_system)
         self.vis.SetCameraVertical(chrono.CameraVerticalDir_Z)
-        self.vis.AddLightWithShadow(chrono.ChVector3d(2, 2, 2),
-                                    chrono.ChVector3d(0, 0, 0),
-                                    5, 1, 11, 55)
+        self.vis.AddLightWithShadow(chrono.ChVector3d(2, 2, 2), chrono.ChVector3d(0, 0, 0), 5, 1, 11, 55)
         self.vis.EnableAbsCoordsysDrawing(True)
         self.vis.Initialize()
         self.vis.AddSkyBox()
-        self.vis.AddCamera(chrono.ChVector3d(-7/3, 0, 4.5/3),
-                           chrono.ChVector3d(0, 0, 0))
-
-        # Get initial observations from all agents.
+        self.vis.AddCamera(chrono.ChVector3d(-7/3, 0, 4.5/3), chrono.ChVector3d(0, 0, 0))
         self.observations = [self._get_observations(i) for i in range(len(self.virtual_robots))]
         return self.observations
 
@@ -234,15 +207,12 @@ class ChronoEnvMulti:
             print("Moved Pos: ", robot.GetPos())
         else:
             action_id = action.item()
-            if action_id == 1:  # MOVE_FORWARD
+            if action_id == 1:
                 rot_state = robot.GetRot().GetCardanAnglesXYZ()
-                robot.SetPos(robot.GetPos() + chrono.ChVector3d(
-                    0.01 * np.cos(rot_state.z),
-                    0.01 * np.sin(rot_state.z),
-                    0))
-            elif action_id == 2:  # TURN_LEFT
+                robot.SetPos(robot.GetPos() + chrono.ChVector3d(0.01 * np.cos(rot_state.z), 0.01 * np.sin(rot_state.z), 0))
+            elif action_id == 2:
                 robot.SetRot(chrono.QuatFromAngleZ(np.pi/12) * robot.GetRot())
-            elif action_id == 3:  # TURN_RIGHT
+            elif action_id == 3:
                 robot.SetRot(chrono.QuatFromAngleZ(-np.pi/12) * robot.GetRot())
 
     def quaternion_to_yaw(self, quaternion):
@@ -250,20 +220,43 @@ class ChronoEnvMulti:
         yaw = np.arctan2(2 * (w * z + x * y), 1 - 2 * (y**2 + z**2))
         return yaw
 
-if __name__ == "__main__":
-    # For debugging the shared obstacle map, we will run with one agent.
-    # Import the shared mapping class and policy.
-    from vlfm.mapping.obstacle_map import ObstacleMap
-    from vlfm.policy.chrono_policies_multiple import ChronoITMPolicyV2
 
-    # Define parameters as in your single-agent implementation.
+
+if __name__ == "__main__":
+    env = ChronoEnv(target_object='toilet', num_agents=1)
+    obs = env.reset()
+    # Take fake step
+    # obs, stop = env.step(torch.tensor([[0]])) 
+    # sensor params
+    camera_height = 0.5
+    min_depth = 0
+    max_depth = 5.5
+    camera_fov = 80.67 #1.408 # in deg 80.67
+    image_width = 640 #213
+
+    # kwargs for itm policy
+    # name = "ChronoITMPolicy"
+    text_prompt = "Seems like there is a target_object ahead."
+    # text_prompt = "Find a target_object"
+    use_max_confidence = False
+    pointnav_policy_path = "data/pointnav_weights.pth"
+    depth_image_shape = (480, 640) # (160, 213)
+    pointnav_stop_radius = 0.5
+    object_map_erosion_size = 5
+    exploration_thresh = 0.7
+    obstacle_map_area_threshold = 1.5  # in square meters
     min_obstacle_height = 0.3
     max_obstacle_height = 0.5
-    agent_radius = 0.15
-    obstacle_map_area_threshold = 1.5
     hole_area_thresh = 100000
+    use_vqa = False
+    vqa_prompt = "Is this "
+    coco_threshold = 0.8
+    non_coco_threshold = 0.4
+    agent_radius = 0.15
 
     # Create the shared obstacle map with all required parameters.
+    from vlfm.mapping.obstacle_map import ObstacleMap
+
     shared_map = ObstacleMap(
         min_height=min_obstacle_height,
         max_height=max_obstacle_height,
@@ -272,27 +265,12 @@ if __name__ == "__main__":
         hole_area_thresh=hole_area_thresh,
     )
 
-
-    # Instantiate a single policy instance.
-    camera_height = 0.5
-    min_depth = 0
-    max_depth = 5.5
-    camera_fov = 80.67  # in degrees
-    image_width = 640
-    text_prompt = "Seems like there is a target_object ahead."
-    use_max_confidence = False
-    pointnav_policy_path = "data/pointnav_weights.pth"
-    depth_image_shape = (480, 640)
-    pointnav_stop_radius = 0.5
-    object_map_erosion_size = 5
-
-    policy = ChronoITMPolicyV2(
+    policy = vlfm.policy.chrono_policies_multiple.ChronoITMPolicyV2(
         camera_height=camera_height,
         min_depth=min_depth,
         max_depth=max_depth,
         camera_fov=camera_fov,
         image_width=image_width,
-        shared_map=shared_map,
         text_prompt=text_prompt,
         use_max_confidence=use_max_confidence,
         pointnav_policy_path=pointnav_policy_path,
@@ -303,60 +281,58 @@ if __name__ == "__main__":
         min_obstacle_height=min_obstacle_height,
         max_obstacle_height=max_obstacle_height,
         hole_area_thresh=hole_area_thresh,
-        use_vqa=False,
-        vqa_prompt="Is this ",
-        coco_threshold=0.8,
-        non_coco_threshold=0.4,
-        agent_radius=agent_radius
+        use_vqa=use_vqa,
+        vqa_prompt=vqa_prompt,
+        coco_threshold=coco_threshold,
+        non_coco_threshold=non_coco_threshold,
+        agent_radius=agent_radius,
+        shared_map = shared_map
     )
 
-    # Create the Chrono environment with one agent by passing num_agents=1.
-    env = ChronoEnvMulti(target_object=TARGET_OBJECT, num_agents=1)
-    observations = env.reset()
-
-    # Optionally, initialize a dummy mask.
-    masks = torch.zeros(1, 1)
-    
-    # Simulation loop.
-    end_time = 10  # seconds
+    end_time = 10
     control_timestep = 0.1
     time_count = 0
-    stop = False
-
-    while time_count < end_time and not stop:
-        # Get the agent's action from its policy.
-        action, _ = policy.act(observations[0], None, None, masks)
+    masks = torch.zeros(1, 1)
+    obs, stop = env.step([torch.tensor([[5]], dtype=torch.long)])
+    while time_count < end_time:
+        action, _ = policy.act(obs[0], None, None, masks)
         actions = [action]
-
         masks = torch.ones(1, 1)
-        observations, stop = env.step(actions)
+        obs, stop = env.step(actions)
         if stop:
             break
 
-        # For debugging, print a summary of the observation:
-        print(f"Step {time_count:.2f}: GPS = {observations[0]['gps']}  | Compass = {observations[0]['compass']}")
+        # # Visualize the depth and RGB images
+        # import matplotlib.pyplot as plt
+        # # Convert depth and RGB observations to numpy arrays
+        # # annotated_depth = torch.flip(obs["depth"], dims=[0, 1]).numpy()
+        # annotated_depth = obs["depth"].numpy()
 
-        # Optionally, visualize the RGB and depth images.
-        import matplotlib.pyplot as plt
-        annotated_depth = observations[0]["depth"].numpy()
-        rgb_image = observations[0]["rgb"].numpy()
+        # # annotated_depth = torch.flip(annotated_depth, dims=[0, 1]).numpy()e
+        # rgb_image = obs["rgb"].numpy()
+        # # Plot the depth and RGB images
+        # plt.figure(figsize=(15, 5))
+        # # Annotated Depth Image
+        # plt.subplot(1, 2, 1)
+        # plt.title("Annotated Depth")
+        # # Use grayscale for depth visualization
+        # plt.imshow(annotated_depth, cmap='gray')
+        # plt.axis('off')
+        # # RGB Image
+        # plt.subplot(1, 2, 2)
+        # plt.title("RGB Image")
+        # plt.imshow(rgb_image)  # No need for cmap, as it's an RGB image
+        # plt.axis('off')
+        # # Display the plot
+        # plt.tight_layout()
+        # # ---------------------------------------
 
-        plt.figure(figsize=(10, 4))
-        plt.subplot(1, 2, 1)
-        plt.title("Depth")
-        plt.imshow(annotated_depth, cmap='gray')
-        plt.axis('off')
-        plt.subplot(1, 2, 2)
-        plt.title("RGB")
-        plt.imshow(rgb_image)
-        plt.axis('off')
-        plt.tight_layout()
-        timestamp = time.strftime("%Y%m%d-%H%M%S")
-        plt.savefig(f"tmp_vis_2/single_agent_policy_info_{timestamp}.png")
-        plt.close()
+        # # Save the figure to a file with a unique name
+        # timestamp = time.strftime("%Y%m%d-%H%M%S")
+        # plt.savefig(f"tmp_vis_2/policy_info_visualization_{timestamp}.png")
+        # plt.close()
+
+        # obs, stop = env.step(torch.tensor(0))
+        # print(vlfm_policy._policy_info)
 
         time_count += control_timestep
-
-    # Optionally, you can output the visualized obstacle map:
-    # obstacle_vis = shared_map.visualize()
-    # cv2.imwrite("tmp_vis_2/shared_obstacle_map.png", obstacle_vis)
