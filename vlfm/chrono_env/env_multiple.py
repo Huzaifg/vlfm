@@ -1,5 +1,3 @@
-# this one sort of works but takes a different path than the original when navigating to the bathroom
-
 import time
 import vlfm.policy.chrono_policies_multiple
 import math
@@ -10,6 +8,7 @@ import pychrono as chrono
 import sys
 import os
 import torch
+
 # Assuming the script is located in the 'experiments/apartment' directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, '../../'))
@@ -48,6 +47,7 @@ class ChronoEnv:
         self.my_system.SetCollisionSystemType(chrono.ChCollisionSystem.Type_BULLET)
         patch_mat = chrono.ChContactMaterialSMC()
 
+        # Specify starting positions for 1 or 2 agents
         if self.num_agents == 1:
             start_positions = [chrono.ChVector3d(-1.25, -1.25, 0.25)]
         else:
@@ -58,7 +58,13 @@ class ChronoEnv:
 
         self.manager = sens.ChSensorManager(self.my_system)
         intensity_moderate = 1.0
-        self.manager.scene.AddAreaLight(chrono.ChVector3f(0, 0, 1), chrono.ChColor(intensity_moderate, intensity_moderate, intensity_moderate), 500.0, chrono.ChVector3f(1, 0, 0), chrono.ChVector3f(0, -1, 0))
+        self.manager.scene.AddAreaLight(
+            chrono.ChVector3f(0, 0, 1),
+            chrono.ChColor(intensity_moderate, intensity_moderate, intensity_moderate),
+            500.0,
+            chrono.ChVector3f(1, 0, 0),
+            chrono.ChVector3f(0, -1, 0)
+        )
 
         for pos in start_positions:
             robot = chrono.ChBodyEasyBox(0.25, 0.25, 0.5, 100, True, True, patch_mat)
@@ -69,18 +75,9 @@ class ChronoEnv:
             offset_pose = chrono.ChFramed(chrono.ChVector3d(0.3, 0, 0.25), chrono.QUNIT)
 
             lidar = sens.ChLidarSensor(
-                robot,
-                30,
-                offset_pose,
-                self.image_width,
-                self.image_height,
-                self.fov,
-                chrono.CH_PI/6,
-                -chrono.CH_PI/6,
-                3.66,
-                sens.LidarBeamShape_RECTANGULAR,
-                1,
-                0, 0,
+                robot, 30, offset_pose, self.image_width, self.image_height, self.fov,
+                chrono.CH_PI/6, -chrono.CH_PI/6, 3.66,
+                sens.LidarBeamShape_RECTANGULAR, 1, 0, 0,
                 sens.LidarReturnMode_STRONGEST_RETURN
             )
             lidar.SetName("Lidar Sensor")
@@ -92,12 +89,8 @@ class ChronoEnv:
             self.lidar_list.append(lidar)
 
             cam = sens.ChCameraSensor(
-                robot,
-                self.update_rate,
-                offset_pose,
-                self.image_width,
-                self.image_height,
-                self.fov
+                robot, self.update_rate, offset_pose,
+                self.image_width, self.image_height, self.fov
             )
             cam.SetName("Camera Sensor")
             cam.SetLag(self.lag)
@@ -221,30 +214,30 @@ class ChronoEnv:
         return yaw
 
 
-
 if __name__ == "__main__":
-    env = ChronoEnv(target_object='toilet', num_agents=1)
+    # Initialize environment with two agents.
+    env = ChronoEnv(target_object='toilet', num_agents=2)
     obs = env.reset()
-    # Take fake step
-    # obs, stop = env.step(torch.tensor([[0]])) 
-    # sensor params
+    
+    # Use an initial action for both agents.
+    initial_action = torch.tensor([[5]], dtype=torch.long)
+    obs, stop = env.step([initial_action for _ in range(env.num_agents)])
+
+    # Sensor and policy parameters.
     camera_height = 0.5
     min_depth = 0
     max_depth = 5.5
-    camera_fov = 80.67 #1.408 # in deg 80.67
-    image_width = 640 #213
+    camera_fov = 80.67  # in degrees
+    image_width = 640
 
-    # kwargs for itm policy
-    # name = "ChronoITMPolicy"
     text_prompt = "Seems like there is a target_object ahead."
-    # text_prompt = "Find a target_object"
     use_max_confidence = False
     pointnav_policy_path = "data/pointnav_weights.pth"
-    depth_image_shape = (480, 640) # (160, 213)
+    depth_image_shape = (480, 640)
     pointnav_stop_radius = 0.5
     object_map_erosion_size = 5
     exploration_thresh = 0.7
-    obstacle_map_area_threshold = 1.5  # in square meters
+    obstacle_map_area_threshold = 1.5
     min_obstacle_height = 0.3
     max_obstacle_height = 0.5
     hole_area_thresh = 100000
@@ -254,11 +247,10 @@ if __name__ == "__main__":
     non_coco_threshold = 0.4
     agent_radius = 0.15
 
-    # Create the shared obstacle map with all required parameters.
     from vlfm.mapping.obstacle_map import ObstacleMap
     from vlfm.mapping.value_map import ValueMap
 
-
+    # Create shared maps.
     shared_map = ObstacleMap(
         min_height=min_obstacle_height,
         max_height=max_obstacle_height,
@@ -267,14 +259,13 @@ if __name__ == "__main__":
         hole_area_thresh=hole_area_thresh,
     )
 
-    # Create a shared value map. Choose your desired parameters.
-    # Here, for instance, we set value_channels to 1. Adjust as needed.
     shared_value_map = ValueMap(
-        value_channels=1,  # or use len(text_prompt.split(PROMPT_SEPARATOR)) if that makes sense
+        value_channels=1,
         use_max_confidence=False,
-        obstacle_map=None  # optionally, link the obstacle map for fusion
+        obstacle_map=None  # Optionally, link obstacle map for fusion
     )
 
+    # Instantiate the policy with both shared maps.
     policy = vlfm.policy.chrono_policies_multiple.ChronoITMPolicyV2(
         camera_height=camera_height,
         min_depth=min_depth,
@@ -296,54 +287,45 @@ if __name__ == "__main__":
         coco_threshold=coco_threshold,
         non_coco_threshold=non_coco_threshold,
         agent_radius=agent_radius,
-        shared_map = shared_map,
+        shared_map=shared_map,
         shared_value_map=shared_value_map
     )
 
     end_time = 10
     control_timestep = 0.1
     time_count = 0
-    masks = torch.zeros(1, 1)
-    obs, stop = env.step([torch.tensor([[5]], dtype=torch.long)])
+    # Use a mask with one entry per agent.
+    masks = torch.zeros(env.num_agents, 1)
+    
     while time_count < end_time:
-        action, _ = policy.act(obs[0], None, None, masks)
-        actions = [action]
-        masks = torch.ones(1, 1)
+        actions = []
+        # Process each agent's observation.
+        for agent_obs in obs:
+            action, _ = policy.act(agent_obs, None, None, masks)
+            actions.append(action)
+        # Update the masks for all agents.
+        masks = torch.ones(env.num_agents, 1)
         obs, stop = env.step(actions)
         if stop:
             break
 
-        # # Visualize the depth and RGB images
+        # (Optional) Uncomment the following code block to visualize RGB and depth images.
         # import matplotlib.pyplot as plt
-        # # Convert depth and RGB observations to numpy arrays
-        # # annotated_depth = torch.flip(obs["depth"], dims=[0, 1]).numpy()
-        # annotated_depth = obs["depth"].numpy()
-
-        # # annotated_depth = torch.flip(annotated_depth, dims=[0, 1]).numpy()e
-        # rgb_image = obs["rgb"].numpy()
-        # # Plot the depth and RGB images
-        # plt.figure(figsize=(15, 5))
-        # # Annotated Depth Image
-        # plt.subplot(1, 2, 1)
-        # plt.title("Annotated Depth")
-        # # Use grayscale for depth visualization
-        # plt.imshow(annotated_depth, cmap='gray')
-        # plt.axis('off')
-        # # RGB Image
-        # plt.subplot(1, 2, 2)
-        # plt.title("RGB Image")
-        # plt.imshow(rgb_image)  # No need for cmap, as it's an RGB image
-        # plt.axis('off')
-        # # Display the plot
-        # plt.tight_layout()
-        # # ---------------------------------------
-
-        # # Save the figure to a file with a unique name
-        # timestamp = time.strftime("%Y%m%d-%H%M%S")
-        # plt.savefig(f"tmp_vis_2/policy_info_visualization_{timestamp}.png")
-        # plt.close()
-
-        # obs, stop = env.step(torch.tensor(0))
-        # print(vlfm_policy._policy_info)
+        # for i, agent_obs in enumerate(obs):
+        #     rgb_image = agent_obs["rgb"].numpy()
+        #     annotated_depth = agent_obs["depth"].numpy()
+        #     plt.figure(figsize=(15, 5))
+        #     plt.subplot(1, 2, 1)
+        #     plt.title(f"Agent {i} RGB")
+        #     plt.imshow(rgb_image)
+        #     plt.axis('off')
+        #     plt.subplot(1, 2, 2)
+        #     plt.title(f"Agent {i} Depth")
+        #     plt.imshow(annotated_depth, cmap='gray')
+        #     plt.axis('off')
+        #     plt.tight_layout()
+        #     timestamp = time.strftime("%Y%m%d-%H%M%S")
+        #     plt.savefig(f"tmp_vis_2/policy_info_visualization_agent{i}_{timestamp}.png")
+        #     plt.close()
 
         time_count += control_timestep
