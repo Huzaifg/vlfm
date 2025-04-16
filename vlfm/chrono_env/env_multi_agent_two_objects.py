@@ -53,7 +53,7 @@ class ChronoEnv:
         else:
             start_positions = [
                 chrono.ChVector3d(-1.25, -1.25, 0.25),
-                chrono.ChVector3d(1.25, 1.25, 0.25),
+                chrono.ChVector3d(-1.25, 1.25, 0.25),
             ]
 
         self.manager = sens.ChSensorManager(self.my_system)
