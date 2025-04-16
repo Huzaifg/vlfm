@@ -18,7 +18,7 @@ sys.path.append(project_root)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 class ChronoEnv:
-    def __init__(self, target_object: str = "toilet", num_agents: int = 1):
+    def __init__(self, target_objects, num_agents: int = 1):
         self.num_agents = num_agents
         self.my_system = None
         self.out_dir = "SENSOR_OUTPUT/"
@@ -38,7 +38,7 @@ class ChronoEnv:
         self.step_number = 0
         self.render_frame = 0
         self.observations = None
-        self.target_object = target_object
+        self.target_objects = target_objects
         self.virtual_robots = []
         self.lidar_list = []
         self.cam_list = []
@@ -142,13 +142,13 @@ class ChronoEnv:
         self.vis.EndScene()
 
         new_observations = [self._get_observations(i) for i in range(len(self.virtual_robots))]
-        stop = any(self._get_stop(action) for action in actions)
+        stop = all(self._get_stop(action) for action in actions)
         return new_observations, stop
 
     def _get_stop(self, action):
         if isinstance(action, torch.Tensor) and action.numel() == 1 and action.item() == 0:
             print("STOPPED")
-            time.sleep(5)
+            # time.sleep(5)
             return True
         return False
         # if action[0][0] == 0:
@@ -185,13 +185,14 @@ class ChronoEnv:
         quat_list = [robot.GetRot().e0, robot.GetRot().e1, robot.GetRot().e2, robot.GetRot().e3]
         yaw = self.quaternion_to_yaw(quat_list)
         robot_yaw = torch.tensor(yaw, dtype=torch.float32)
-
+        print("target_object: ", self.target_objects[idx])
+        target_object = self.target_objects[idx]
         obs_dict = {
             "rgb": camera_data,
             "depth": depth_data,
             "gps": torch.stack((robot_x, robot_y)),
             "compass": robot_yaw,
-            "objectgoal": self.target_object
+            "objectgoal": target_object
         }
         return obs_dict
 
@@ -228,7 +229,7 @@ class ChronoEnv:
 
 
 if __name__ == "__main__":
-    env = ChronoEnv(target_object='toilet', num_agents=1)
+    env = ChronoEnv(['tv', 'toilet'], num_agents=2)
     obs = env.reset()
     # Take fake step
     # obs, stop = env.step(torch.tensor([[0]])) 
@@ -270,7 +271,7 @@ if __name__ == "__main__":
     #     hole_area_thresh=hole_area_thresh,
     # )
 
-    policy = vlfm.policy.chrono_policies.ChronoITMPolicyV2(
+    policy_1 = vlfm.policy.chrono_policies.ChronoITMPolicyV2(
         camera_height=camera_height,
         min_depth=min_depth,
         max_depth=max_depth,
@@ -291,7 +292,29 @@ if __name__ == "__main__":
         coco_threshold=coco_threshold,
         non_coco_threshold=non_coco_threshold,
         agent_radius=agent_radius
-        # shared_map = shared_map
+    )
+
+    policy_2 = vlfm.policy.chrono_policies.ChronoITMPolicyV2(
+        camera_height=camera_height,
+        min_depth=min_depth,
+        max_depth=max_depth,
+        camera_fov=camera_fov,
+        image_width=image_width,
+        text_prompt=text_prompt,
+        use_max_confidence=use_max_confidence,
+        pointnav_policy_path=pointnav_policy_path,
+        depth_image_shape=depth_image_shape,
+        pointnav_stop_radius=pointnav_stop_radius,
+        object_map_erosion_size=object_map_erosion_size,
+        obstacle_map_area_threshold=obstacle_map_area_threshold,
+        min_obstacle_height=min_obstacle_height,
+        max_obstacle_height=max_obstacle_height,
+        hole_area_thresh=hole_area_thresh,
+        use_vqa=use_vqa,
+        vqa_prompt=vqa_prompt,
+        coco_threshold=coco_threshold,
+        non_coco_threshold=non_coco_threshold,
+        agent_radius=agent_radius
     )
 
     end_time = 10
@@ -300,10 +323,13 @@ if __name__ == "__main__":
     masks = torch.zeros(1, 1)
     obs, stop = env.step([torch.tensor([[5]], dtype=torch.long)])
     while time_count < end_time:
-        action_1, _ = policy.act(obs[0], None, None, masks)
-        actions = [action_1]
+        action_1, _ = policy_1.act(obs[0], None, None, masks)
+        action_2, _ = policy_2.act(obs[1], None, None, masks)
+        actions = [action_1, action_2]
         masks = torch.ones(1, 1)
         obs, stop = env.step(actions)
+
+
         if stop:
             break
 
