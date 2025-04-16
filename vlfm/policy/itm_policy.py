@@ -274,7 +274,12 @@ class BaseITMPolicy(BaseObjectNavPolicy):
         for cosine, (rgb, depth, tf, min_depth, max_depth, fov) in zip(
             cosines, self._observations_cache["value_map_rgbd"]
         ):
-            self._value_map.update_map(np.array(cosine), depth, tf, min_depth, max_depth, fov)
+            # Compute a local confidence map (a 2D array) from the depth.
+            local_conf = self.shared_map._process_local_data(depth, fov, min_depth, max_depth)
+            # Create a value update array with the same shape as local_conf.
+            value_update = np.full_like(local_conf, np.array(cosine))
+            # Pass these in as lists.
+            self._value_map.update_map([local_conf], [value_update], min_depth, max_depth, fov)
 
         self._value_map.update_agent_traj(
             self._observations_cache["robot_xy"],

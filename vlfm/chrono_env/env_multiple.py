@@ -303,6 +303,10 @@ if __name__ == "__main__":
         for agent_obs in obs:
             action, _ = policy.act(agent_obs, None, None, masks)
             actions.append(action)
+
+        # NEW: Update the shared maps using all accumulated sensor info from both agents.
+        policy._update_shared_maps()
+
         # Update the masks for all agents.
         masks = torch.ones(env.num_agents, 1)
         obs, stop = env.step(actions)

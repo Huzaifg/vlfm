@@ -99,43 +99,34 @@ class ValueMap(BaseMap):
 
     def update_map(
         self,
-        values: np.ndarray,
-        depth: np.ndarray,
-        tf_camera_to_episodic: np.ndarray,
+        new_maps_list: List[np.ndarray],
+        new_values_list: List[np.ndarray],
         min_depth: float,
         max_depth: float,
         fov: float,
     ) -> None:
-        """Updates the value map with the given depth image, pose, and value to use.
+        """
+        Updates the value map using a list of new updates (one per agent).
 
         Args:
-            values: The value to use for updating the map.
-            depth: The depth image to use for updating the map; expected to be already
-                normalized to the range [0, 1].
-            tf_camera_to_episodic: The transformation matrix from the episodic frame to
-                the camera frame.
-            min_depth: The minimum depth value in meters.
-            max_depth: The maximum depth value in meters.
-            fov: The field of view of the camera in RADIANS.
+            new_maps_list: A list of numpy arrays of shape (H, W), each a new confidence map.
+            new_values_list: A list of numpy arrays, each with shape (H, W) or (H, W, value_channels),
+                             representing new value updates.
+            min_depth: The minimum depth value (in meters).
+            max_depth: The maximum depth value (in meters).
+            fov: The field of view of the camera in radians.
         """
-        assert (
-            len(values) == self._value_channels
-        ), f"Incorrect number of values given ({len(values)}). Expected {self._value_channels}."
-
-        curr_map = self._localize_new_data(depth, tf_camera_to_episodic, min_depth, max_depth, fov)
-
-        # Fuse the new data with the existing data
-        self._fuse_new_data(curr_map, values)
+        self._fuse_new_data(new_maps_list, new_values_list)
 
         if RECORDING:
             idx = len(glob.glob(osp.join(RECORDING_DIR, "*.png")))
+            # For recording purposes, record the first agent's depth (for example)
             img_path = osp.join(RECORDING_DIR, f"{idx:04d}.png")
-            cv2.imwrite(img_path, (depth * 255).astype(np.uint8))
+            cv2.imwrite(img_path, (new_maps_list[0] * 255).astype(np.uint8))
             with open(JSON_PATH, "r") as f:
                 data = json.load(f)
             data[img_path] = {
-                "values": values.tolist(),
-                "tf_camera_to_episodic": tf_camera_to_episodic.tolist(),
+                "values": new_values_list[0].tolist(),
                 "min_depth": min_depth,
                 "max_depth": max_depth,
                 "fov": fov,
@@ -193,17 +184,13 @@ class ValueMap(BaseMap):
         obstacle_map: Optional["ObstacleMap"] = None,  # type: ignore # noqa: F821
     ) -> np.ndarray:
         """Return an image representation of the map"""
-        # Must negate the y values to get the correct orientation
         reduced_map = reduce_fn(self._value_map).copy()
         if obstacle_map is not None:
             reduced_map[obstacle_map.explored_area == 0] = 0
         map_img = np.flipud(reduced_map)
-        # Make all 0s in the value map equal to the max value, so they don't throw off
-        # the color mapping (will revert later)
         zero_mask = map_img == 0
         map_img[zero_mask] = np.max(map_img)
         map_img = monochannel_to_inferno_rgb(map_img)
-        # Revert all values that were originally zero to white
         map_img[zero_mask] = (255, 255, 255)
         if len(self._camera_positions) > 0:
             self._traj_vis.draw_trajectory(
@@ -211,7 +198,6 @@ class ValueMap(BaseMap):
                 self._camera_positions,
                 self._last_camera_yaw,
             )
-
             if markers is not None:
                 for pos, marker_kwargs in markers:
                     map_img = self._traj_vis.draw_circle(map_img, pos, **marker_kwargs)
@@ -219,58 +205,30 @@ class ValueMap(BaseMap):
         return map_img
 
     def _process_local_data(self, depth: np.ndarray, fov: float, min_depth: float, max_depth: float) -> np.ndarray:
-        """Using the FOV and depth, return the visible portion of the FOV.
-
-        Args:
-            depth: The depth image to use for determining the visible portion of the
-                FOV.
-        Returns:
-            A mask of the visible portion of the FOV.
-        """
-        # Squeeze out the channel dimension if depth is a 3D array
         if len(depth.shape) == 3:
             depth = depth.squeeze(2)
-        # Squash depth image into one row with the max depth value for each column
         depth_row = np.max(depth, axis=0) * (max_depth - min_depth) + min_depth
-
-        # Create a linspace of the same length as the depth row from -fov/2 to fov/2
         angles = np.linspace(-fov / 2, fov / 2, len(depth_row))
-
-        # Assign each value in the row with an x, y coordinate depending on 'angles'
-        # and the max depth value for that column
         x = depth_row
         y = depth_row * np.tan(angles)
-
-        # Get blank cone mask
         cone_mask = self._get_confidence_mask(fov, max_depth)
-
-        # Convert the x, y coordinates to pixel coordinates
         x = (x * self.pixels_per_meter + cone_mask.shape[0] / 2).astype(int)
         y = (y * self.pixels_per_meter + cone_mask.shape[1] / 2).astype(int)
-
-        # Create a contour from the x, y coordinates, with the top left and right
-        # corners of the image as the first two points
         last_row = cone_mask.shape[0] - 1
         last_col = cone_mask.shape[1] - 1
         start = np.array([[0, last_col]])
         end = np.array([[last_row, last_col]])
         contour = np.concatenate((start, np.stack((y, x), axis=1), end), axis=0)
-
-        # Draw the contour onto the cone mask, in filled-in black
         visible_mask = cv2.drawContours(cone_mask, [contour], -1, 0, -1)  # type: ignore
-
         if DEBUG:
             vis = cv2.cvtColor((cone_mask * 255).astype(np.uint8), cv2.COLOR_GRAY2RGB)
             cv2.drawContours(vis, [contour], -1, (0, 0, 255), -1)
             for point in contour:
                 vis[point[1], point[0]] = (0, 255, 0)
             if SAVE_VISUALIZATIONS:
-                # Create visualizations directory if it doesn't exist
                 if not os.path.exists("visualizations"):
                     os.makedirs("visualizations")
-                # Expand the depth_row back into a full image
                 depth_row_full = np.repeat(depth_row.reshape(1, -1), depth.shape[0], axis=0)
-                # Stack the depth images with the visible mask
                 depth_rgb = cv2.cvtColor((depth * 255).astype(np.uint8), cv2.COLOR_GRAY2RGB)
                 depth_row_full = cv2.cvtColor((depth_row_full * 255).astype(np.uint8), cv2.COLOR_GRAY2RGB)
                 vis = np.flipud(vis)
@@ -282,7 +240,6 @@ class ValueMap(BaseMap):
             else:
                 cv2.imshow("obstacle mask", vis)
                 cv2.waitKey(0)
-
         return visible_mask
 
     def _localize_new_data(
@@ -293,10 +250,7 @@ class ValueMap(BaseMap):
         max_depth: float,
         fov: float,
     ) -> np.ndarray:
-        # Get new portion of the map
         curr_data = self._process_local_data(depth, fov, min_depth, max_depth)
-
-        # Rotate this new data to match the camera's orientation
         yaw = extract_yaw(tf_camera_to_episodic)
         if PLAYING:
             if yaw > 0:
@@ -304,38 +258,29 @@ class ValueMap(BaseMap):
             else:
                 yaw = np.deg2rad(30)
         curr_data = rotate_image(curr_data, -yaw)
-
-        # Determine where this mask should be overlaid
         cam_x, cam_y = tf_camera_to_episodic[:2, 3] / tf_camera_to_episodic[3, 3]
-
-        # Convert to pixel units
         px = int(cam_x * self.pixels_per_meter) + self._episode_pixel_origin[0]
         py = int(-cam_y * self.pixels_per_meter) + self._episode_pixel_origin[1]
-
-        # Overlay the new data onto the map
         curr_map = np.zeros_like(self._map)
         curr_map = place_img_in_img(curr_map, curr_data, px, py)
-
         return curr_map
 
     def _get_blank_cone_mask(self, fov: float, max_depth: float) -> np.ndarray:
-        """Generate a FOV cone without any obstacles considered"""
         size = int(max_depth * self.pixels_per_meter)
         cone_mask = np.zeros((size * 2 + 1, size * 2 + 1))
-        cone_mask = cv2.ellipse(  # type: ignore
+        cone_mask = cv2.ellipse(
             cone_mask,
-            (size, size),  # center_pixel
-            (size, size),  # axes lengths
-            0,  # angle circle is rotated
-            -np.rad2deg(fov) / 2 + 90,  # start_angle
-            np.rad2deg(fov) / 2 + 90,  # end_angle
-            1,  # color
-            -1,  # thickness
+            (size, size),
+            (size, size),
+            0,
+            -np.rad2deg(fov) / 2 + 90,
+            np.rad2deg(fov) / 2 + 90,
+            1,
+            -1,
         )
         return cone_mask
 
     def _get_confidence_mask(self, fov: float, max_depth: float) -> np.ndarray:
-        """Generate a FOV cone with central values weighted more heavily"""
         if (fov, max_depth) in self._confidence_masks:
             return self._confidence_masks[(fov, max_depth)].copy()
         cone_mask = self._get_blank_cone_mask(fov, max_depth)
@@ -351,97 +296,72 @@ class ValueMap(BaseMap):
                 adjusted_mask[row, col] = confidence
         adjusted_mask = adjusted_mask * cone_mask
         self._confidence_masks[(fov, max_depth)] = adjusted_mask.copy()
-
         return adjusted_mask
 
-    def _fuse_new_data(self, new_map: np.ndarray, values: np.ndarray) -> None:
-        """Fuse the new data with the existing value and confidence maps.
+    def _fuse_new_data(self, new_maps_list: list, new_values_list: list) -> None:
+        """
+        Fuse multiple new map updates (from different agents) with the existing
+        confidence map (self._map) and value map (self._value_map).
 
         Args:
-            new_map: The new new_map map data to fuse. Confidences are between
-                0 and 1, with 1 being the most confident.
-            values: The values attributed to the new portion of the map.
+            new_maps_list: A list of numpy arrays of shape (H, W), containing the new
+                           confidence/observation maps from each agent.
+            new_values_list: A list of numpy arrays, each of shape (H, W, value_channels) or (H, W)
+                             for a single channel, containing the new value estimates from the agent.
         """
-        assert (
-            len(values) == self._value_channels
-        ), f"Incorrect number of values given ({len(values)}). Expected {self._value_channels}."
+        for idx, values in enumerate(new_values_list):
+            if values.ndim < 2:
+                raise ValueError(f"Expected values array with at least 2 dimensions, got shape {values.shape}.")
+            if values.ndim == 2:
+                if self._value_channels == 1:
+                    new_values_list[idx] = values[..., np.newaxis]
+                else:
+                    raise ValueError(f"Expected values with {self._value_channels} channels, but got a 2D array.")
+            if new_values_list[idx].shape[-1] != self._value_channels:
+                raise ValueError(f"Expected {self._value_channels} channels, but got {new_values_list[idx].shape[-1]}.")
 
         if self._obstacle_map is not None:
-            # If an obstacle map is provided, we will use it to mask out the
-            # new map
             explored_area = self._obstacle_map.explored_area
-            new_map[explored_area == 0] = 0
-            self._map[explored_area == 0] = 0
-            self._value_map[explored_area == 0] *= 0
+            for i in range(len(new_maps_list)):
+                new_maps_list[i] = new_maps_list[i].copy()
+                new_values_list[i] = new_values_list[i].copy()
+                new_maps_list[i][explored_area == 0] = 0
+                new_values_list[i][explored_area == 0] = 0
 
         if self._fusion_type == "replace":
-            # Ablation. The values from the current observation will overwrite any
-            # existing values
-            print("VALUE MAP ABLATION:", self._fusion_type)
-            new_value_map = np.zeros_like(self._value_map)
-            new_value_map[new_map > 0] = values
-            self._map[new_map > 0] = new_map[new_map > 0]
-            self._value_map[new_map > 0] = new_value_map[new_map > 0]
+            print("VALUE MAP ABLATION: replace")
+            for new_map, values in zip(new_maps_list, new_values_list):
+                mask = new_map > 0
+                self._map[mask] = new_map[mask]
+                self._value_map[mask] = values[mask]
             return
         elif self._fusion_type == "equal_weighting":
-            # Ablation. Updated values will always be the mean of the current and
-            # new values, meaning that confidence scores are forced to be the same.
-            print("VALUE MAP ABLATION:", self._fusion_type)
+            print("VALUE MAP ABLATION: equal_weighting")
             self._map[self._map > 0] = 1
-            new_map[new_map > 0] = 1
-        else:
-            assert self._fusion_type == "default", f"Unknown fusion type {self._fusion_type}"
+            for i in range(len(new_maps_list)):
+                new_maps_list[i][new_maps_list[i] > 0] = 1
 
-        # Any values in the given map that are less confident than
-        # self._decision_threshold AND less than the new_map in the existing map
-        # will be silenced into 0s
-        new_map_mask = np.logical_and(new_map < self._decision_threshold, new_map < self._map)
-        new_map[new_map_mask] = 0
+        cumulative_confidence = self._map.copy()
+        cumulative_value = self._value_map.copy()
 
-        if self._use_max_confidence:
-            # For every pixel that has a higher new_map in the new map than the
-            # existing value map, replace the value in the existing value map with
-            # the new value
-            higher_new_map_mask = new_map > self._map
-            self._value_map[higher_new_map_mask] = values
-            # Update the new_map map with the new new_map values
-            self._map[higher_new_map_mask] = new_map[higher_new_map_mask]
-        else:
-            # Each pixel in the existing value map will be updated with a weighted
-            # average of the existing value and the new value. The weight of each value
-            # is determined by the current and new new_map values. The new_map map
-            # will also be updated with using a weighted average in a similar manner.
-            confidence_denominator = self._map + new_map
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=RuntimeWarning)
-                weight_1 = self._map / confidence_denominator
-                weight_2 = new_map / confidence_denominator
+        for new_map, values in zip(new_maps_list, new_values_list):
+            new_map_mask = np.logical_and(new_map < self._decision_threshold, new_map < cumulative_confidence)
+            new_map[new_map_mask] = 0
+            confidence_denominator = cumulative_confidence + new_map + 1e-6
+            weight_existing = cumulative_confidence / confidence_denominator
+            weight_new = new_map / confidence_denominator
+            weight_existing_channeled = np.repeat(np.expand_dims(weight_existing, axis=2), self._value_channels, axis=2)
+            weight_new_channeled = np.repeat(np.expand_dims(weight_new, axis=2), self._value_channels, axis=2)
+            cumulative_value = cumulative_value * weight_existing_channeled + values * weight_new_channeled
+            cumulative_confidence = cumulative_confidence + new_map
 
-            weight_1_channeled = np.repeat(np.expand_dims(weight_1, axis=2), self._value_channels, axis=2)
-            weight_2_channeled = np.repeat(np.expand_dims(weight_2, axis=2), self._value_channels, axis=2)
-
-            self._value_map = self._value_map * weight_1_channeled + values * weight_2_channeled
-            self._map = self._map * weight_1 + new_map * weight_2
-
-            # Because confidence_denominator can have 0 values, any nans in either the
-            # value or confidence maps will be replaced with 0
-            self._value_map = np.nan_to_num(self._value_map)
-            self._map = np.nan_to_num(self._map)
+        cumulative_value = np.nan_to_num(cumulative_value)
+        cumulative_confidence = np.nan_to_num(cumulative_confidence)
+        self._value_map = cumulative_value
+        self._map = cumulative_confidence
 
 
 def remap(value: float, from_low: float, from_high: float, to_low: float, to_high: float) -> float:
-    """Maps a value from one range to another.
-
-    Args:
-        value (float): The value to be mapped.
-        from_low (float): The lower bound of the input range.
-        from_high (float): The upper bound of the input range.
-        to_low (float): The lower bound of the output range.
-        to_high (float): The upper bound of the output range.
-
-    Returns:
-        float: The mapped value.
-    """
     return (value - from_low) * (to_high - to_low) / (from_high - from_low) + to_low
 
 
@@ -450,24 +370,17 @@ def replay_from_dir() -> None:
         kwargs = json.load(f)
     with open(JSON_PATH, "r") as f:
         data = json.load(f)
-
     v = ValueMap(**kwargs)
-
     sorted_keys = sorted(list(data.keys()))
-
     for img_path in sorted_keys:
         tf_camera_to_episodic = np.array(data[img_path]["tf_camera_to_episodic"])
         values = np.array(data[img_path]["values"])
         depth = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE).astype(np.float32) / 255.0
-        v.update_map(
-            values,
-            depth,
-            tf_camera_to_episodic,
-            float(data[img_path]["min_depth"]),
-            float(data[img_path]["max_depth"]),
-            float(data[img_path]["fov"]),
-        )
-
+        v.update_map([v._localize_new_data(depth, tf_camera_to_episodic, float(data[img_path]["min_depth"]), float(data[img_path]["max_depth"]), float(data[img_path]["fov"]))],
+                     [values],
+                     float(data[img_path]["min_depth"]),
+                     float(data[img_path]["max_depth"]),
+                     float(data[img_path]["fov"]))
         img = v.visualize()
         cv2.imshow("img", img)
         key = cv2.waitKey(0)
@@ -479,7 +392,6 @@ if __name__ == "__main__":
     if PLAYING:
         replay_from_dir()
         quit()
-
     v = ValueMap(value_channels=1)
     depth = cv2.imread("depth.png", cv2.IMREAD_GRAYSCALE).astype(np.float32) / 255.0
     img = v._process_local_data(
@@ -490,27 +402,21 @@ if __name__ == "__main__":
     )
     cv2.imshow("img", (img * 255).astype(np.uint8))
     cv2.waitKey(0)
-
     num_points = 20
-
     x = [0, 10, 10, 0]
     y = [0, 0, 10, 10]
     angles = [0, np.pi / 2, np.pi, 3 * np.pi / 2]
-
     points = np.stack((x, y), axis=1)
-
     for pt, angle in zip(points, angles):
         tf = np.eye(4)
         tf[:2, 3] = pt
         tf[:2, :2] = get_rotation_matrix(angle)
-        v.update_map(
-            np.array([1]),
-            depth,
-            tf,
-            min_depth=0.5,
-            max_depth=5.0,
-            fov=np.deg2rad(79),
-        )
+        v.update_map([np.array([1])],
+                     [depth],
+                     tf,
+                     min_depth=0.5,
+                     max_depth=5.0,
+                     fov=np.deg2rad(79))
         img = v.visualize()
         cv2.imshow("img", img)
         key = cv2.waitKey(0)
