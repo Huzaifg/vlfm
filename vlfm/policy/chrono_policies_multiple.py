@@ -11,8 +11,8 @@ from vlfm.mapping.obstacle_map import ObstacleMap
 from vlfm.vlm.grounding_dino import ObjectDetections
 
 # Import base policies (assumed to be available in the package structure)
-from .base_objectnav_policy import BaseObjectNavPolicy, VLFMConfig
-from .itm_policy import ITMPolicy, ITMPolicyV2, ITMPolicyV3
+from .base_objectnav_policy_multiple import BaseObjectNavPolicy, VLFMConfig
+from .itm_policy_multiple import ITMPolicy, ITMPolicyV2, ITMPolicyV3
 
 # Define a simple enumeration for action IDs.
 class TorchActionIDs:
@@ -61,7 +61,7 @@ class ChronoMixin(BaseObjectNavPolicy):
         parent_cls: BaseObjectNavPolicy = super()
         # Cache this observation before taking action.
         # self._cache_observations(observations)
-        
+
         # Pre-process observations: cache and aggregate them.
         self._pre_step(observations, masks)
         try:
