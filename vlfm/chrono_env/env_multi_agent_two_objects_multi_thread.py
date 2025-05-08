@@ -10,6 +10,7 @@ import pychrono as chrono
 import sys
 import os
 import torch
+import threading
 # Assuming the script is located in the 'experiments/apartment' directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, '../../'))
@@ -123,17 +124,6 @@ class ChronoEnv:
         self.vis = chronoirr.ChVisualSystemIrrlicht(self.my_system)
         self.vis.SetCameraVertical(chrono.CameraVerticalDir_Z)
         self.vis.AddLightWithShadow(chrono.ChVector3d(2, 2, 2), chrono.ChVector3d(0, 0, 0), 5, 1, 11, 55)
-        self.vis.AddLightWithShadow(chrono.ChVector3d(-2, 1.25, 2),  # point
-                                    chrono.ChVector3d(0, 0, 0),  # aimpoint
-                                    3,                       # radius (power)
-                                    1, 11,                     # near, far
-                                    55)                       # angle of FOV
-
-        self.vis.AddLightWithShadow(chrono.ChVector3d(-2, -2, 2),  # point
-                                    chrono.ChVector3d(0, 0, 0),  # aimpoint
-                                    3,                       # radius (power)
-                                    1, 11,                     # near, far
-                                    55)                       # angle of FOV
         self.vis.EnableAbsCoordsysDrawing(True)
         self.vis.Initialize()
         self.vis.AddSkyBox()
@@ -328,53 +318,46 @@ if __name__ == "__main__":
         agent_radius=agent_radius
     )
 
+    policies = [policy_1, policy_2]
+
+    # Helper function to run policy.act in a thread
+    def run_policy_thread(policy_idx, policy_obj, obs_data, masks_data, result_list):
+        """Calls policy.act and stores the action in the result_list."""
+        action, _ = policy_obj.act(obs_data, None, None, masks_data)
+        result_list[policy_idx] = action # Store action at the correct index
+
     end_time = 10
     control_timestep = 0.1
     time_count = 0
     masks = torch.zeros(1, 1)
     obs, stop = env.step([torch.tensor([[5]], dtype=torch.long)])
     while time_count < end_time:
-        action_1, _ = policy_1.act(obs[0], None, None, masks)
-        action_2, _ = policy_2.act(obs[1], None, None, masks)
-        actions = [action_1, action_2]
-        masks = torch.ones(1, 1)
-        obs, stop = env.step(actions)
+        # --- Start Multi-threading Block ---
+        current_obs = obs # Store observations from previous step for threads
 
+        actions = [None] * env.num_agents # Create list to store actions (size should match num_agents)
+        threads = []
+
+        # Create and start threads (assuming env.num_agents is 2 and policies are policy_1, policy_2)
+        thread1 = threading.Thread(target=run_policy_thread, args=(0, policy_1, current_obs[0], masks, actions))
+        thread2 = threading.Thread(target=run_policy_thread, args=(1, policy_2, current_obs[1], masks, actions))
+
+        threads.extend([thread1, thread2])
+        thread1.start()
+        thread2.start()
+
+        # Wait for both policy threads to complete
+        for t in threads:
+            t.join()
+        # --- End Multi-threading Block ---
+
+        # The 'actions' list now contains [action_1, action_2] collected from threads
+
+        # The rest of your original loop logic follows directly:
+        masks = torch.ones(1, 1)
+        obs, stop = env.step(actions) # Use the collected actions
 
         if stop:
             break
-
-        # # Visualize the depth and RGB images
-        # import matplotlib.pyplot as plt
-        # # Convert depth and RGB observations to numpy arrays
-        # # annotated_depth = torch.flip(obs["depth"], dims=[0, 1]).numpy()
-        # annotated_depth = obs["depth"].numpy()
-
-        # # annotated_depth = torch.flip(annotated_depth, dims=[0, 1]).numpy()e
-        # rgb_image = obs["rgb"].numpy()
-        # # Plot the depth and RGB images
-        # plt.figure(figsize=(15, 5))
-        # # Annotated Depth Image
-        # plt.subplot(1, 2, 1)
-        # plt.title("Annotated Depth")
-        # # Use grayscale for depth visualization
-        # plt.imshow(annotated_depth, cmap='gray')
-        # plt.axis('off')
-        # # RGB Image
-        # plt.subplot(1, 2, 2)
-        # plt.title("RGB Image")
-        # plt.imshow(rgb_image)  # No need for cmap, as it's an RGB image
-        # plt.axis('off')
-        # # Display the plot
-        # plt.tight_layout()
-        # # ---------------------------------------
-
-        # # Save the figure to a file with a unique name
-        # timestamp = time.strftime("%Y%m%d-%H%M%S")
-        # plt.savefig(f"tmp_vis_2/policy_info_visualization_{timestamp}.png")
-        # plt.close()
-
-        # obs, stop = env.step(torch.tensor(0))
-        # print(vlfm_policy._policy_info)
 
         time_count += control_timestep

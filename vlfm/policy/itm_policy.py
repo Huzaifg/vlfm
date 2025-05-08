@@ -199,7 +199,7 @@ class BaseITMPolicy(BaseObjectNavPolicy):
 
         plt.figure(figsize=(16, 8))
         plt.subplot(1, 4, 1)
-        plt.title("RGB")
+        plt.title("Annotated RGB")
         plt.imshow(policy_info["annotated_rgb"])
         plt.axis('off')
 

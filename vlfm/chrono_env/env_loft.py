@@ -17,7 +17,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
 class ChronoEnv:
-    def __init__(self, target_object: str = "tv"):
+    def __init__(self, target_object: str = "toilet"):
         self.my_system = None
 
         # Output directory
@@ -76,12 +76,12 @@ class ChronoEnv:
         # terrain.Initialize()
         self.virtual_robot = chrono.ChBodyEasyBox(
             0.25, 0.25, 0.5, 100, True, True, patch_mat)
-        self.virtual_robot.SetPos(chrono.ChVector3d(-1.25, 0, 0.25))
+        self.virtual_robot.SetPos(chrono.ChVector3d(-1.25, -1.25, 0.25))
         self.virtual_robot.SetFixed(True)
         self.my_system.Add(self.virtual_robot)
         mmesh = chrono.ChTriangleMeshConnected()
         mmesh.LoadWavefrontMesh(
-            project_root + '/data/chrono_environment/new_flat_3.obj', False, True)
+            project_root + '/data/industrial_loft/Interior+scene_no_beda_no_plants.obj', False, True)
 
         # scale to a different size
         # mmesh.Transform(chrono.ChVector3d(0, 0, 0), chrono.ChMatrix33d(2))
@@ -170,18 +170,6 @@ class ChronoEnv:
         self.vis.AddLightWithShadow(chrono.ChVector3d(2, 2, 2),  # point
                                     chrono.ChVector3d(0, 0, 0),  # aimpoint
                                     5,                       # radius (power)
-                                    1, 11,                     # near, far
-                                    55)                       # angle of FOV
-
-        self.vis.AddLightWithShadow(chrono.ChVector3d(-2, 1.25, 2),  # point
-                                    chrono.ChVector3d(0, 0, 0),  # aimpoint
-                                    3,                       # radius (power)
-                                    1, 11,                     # near, far
-                                    55)                       # angle of FOV
-
-        self.vis.AddLightWithShadow(chrono.ChVector3d(-2, -2, 2),  # point
-                                    chrono.ChVector3d(0, 0, 0),  # aimpoint
-                                    3,                       # radius (power)
                                     1, 11,                     # near, far
                                     55)                       # angle of FOV
 

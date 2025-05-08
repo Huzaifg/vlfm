@@ -17,7 +17,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
 class ChronoEnv:
-    def __init__(self, target_object: str = "tv"):
+    def __init__(self, target_object: str = "door"):
         self.my_system = None
 
         # Output directory
@@ -59,6 +59,8 @@ class ChronoEnv:
         self.target_object = target_object  # Target object
         self.virtual_robot = None
 
+        self.wall_1 = None
+
     def reset(self):
         self.my_system = chrono.ChSystemSMC()
         self.my_system.SetCollisionSystemType(
@@ -76,12 +78,12 @@ class ChronoEnv:
         # terrain.Initialize()
         self.virtual_robot = chrono.ChBodyEasyBox(
             0.25, 0.25, 0.5, 100, True, True, patch_mat)
-        self.virtual_robot.SetPos(chrono.ChVector3d(-1.25, 0, 0.25))
+        self.virtual_robot.SetPos(chrono.ChVector3d(0, 0, 0.25))
         self.virtual_robot.SetFixed(True)
         self.my_system.Add(self.virtual_robot)
         mmesh = chrono.ChTriangleMeshConnected()
         mmesh.LoadWavefrontMesh(
-            project_root + '/data/chrono_environment/new_flat_3.obj', False, True)
+            project_root + '/data/chrono_environment/warehouse.obj', False, True)
 
         # scale to a different size
         # mmesh.Transform(chrono.ChVector3d(0, 0, 0), chrono.ChMatrix33d(2))
@@ -97,6 +99,54 @@ class ChronoEnv:
         mesh_body.AddVisualShape(trimesh_shape)
         mesh_body.SetFixed(True)
         self.my_system.Add(mesh_body)
+
+        # Adding walls
+        # patch_mat_1 = chrono.ChContactMaterialSMC()
+        # self.virtual_robot_1 = chrono.ChBodyEasyBox(
+        #     0.25, 0.25, 0.5, 100, True, True, patch_mat_1)
+        # self.virtual_robot_1.SetPos(chrono.ChVector3d(2, 0, 0.25))
+        # self.virtual_robot_1.SetFixed(True)
+        # self.virtual_robot_1.GetVisualShape(0).SetColor(chrono.ChColor(1, 1, 1))
+        # self.my_system.Add(self.virtual_robot_1)
+
+        wall_mat = chrono.ChContactMaterialSMC()
+        self.wall_1 = chrono.ChBodyEasyBox(0.25, 5, 2, 100, True, True, wall_mat)
+        self.wall_1.SetPos(chrono.ChVector3d(2, 0, 0.25))
+        self.wall_1.SetFixed(True)
+        self.wall_1.EnableCollision(False)
+        self.wall_1.GetVisualShape(0).SetColor(chrono.ChColor(1, 1, 1))
+        self.my_system.Add(self.wall_1)
+
+
+        self.wall_2 = chrono.ChBodyEasyBox(5, 0.25, 2, 100, True, True, wall_mat)
+        self.wall_2.SetPos(chrono.ChVector3d(0, 2, 0.25))
+        self.wall_2.SetFixed(True)
+        self.wall_2.EnableCollision(False)
+        self.wall_2.GetVisualShape(0).SetColor(chrono.ChColor(1, 1, 1))
+        self.my_system.Add(self.wall_2)
+
+        self.wall_3 = chrono.ChBodyEasyBox(5, 0.25, 2, 100, True, True, wall_mat)
+        self.wall_3.SetPos(chrono.ChVector3d(0, -2, 0.25))
+        self.wall_3.SetFixed(True)
+        self.wall_3.EnableCollision(False)
+        self.wall_3.GetVisualShape(0).SetColor(chrono.ChColor(1, 1, 1))
+        self.my_system.Add(self.wall_3)
+
+        
+        # self.wall_1 = chrono.ChBodyEasyBox(0.5, 0.25, 2, 100, True, True, wall_mat)
+        # self.wall_1.SetPos(chrono.ChVector3d(0, 2, 0.25))
+        # self.wall_1.SetFixed(True)
+        # self.wall_1.EnableCollision(False)
+        # self.wall_1.GetVisualShape(0).SetColor(chrono.ChColor(1, 1, 1))
+        # self.my_system.Add(self.wall_1)
+
+        # wall_mat = chrono.ChContactMaterialSMC()
+        # self.wall_3 = chrono.ChBodyEasyBox(0.25, 5, 2, 100, True, True, wall_mat)
+        # self.wall_3.SetPos(chrono.ChVector3d(2, 0, 0.25))
+        # self.wall_3.SetFixed(True)
+        # self.wall_3.EnableCollision(False)
+        # self.wall_3.GetVisualShape(0).SetColor(chrono.ChColor(1, 1, 1))
+        # self.my_system.Add(self.wall_3)
 
         # ---------------------------------------
 
@@ -127,7 +177,7 @@ class ChronoEnv:
             self.fov,                    # horizontal field of view
             chrono.CH_PI/6,         # vertical field of view
             -chrono.CH_PI/6,
-            5.5, #3.66,                  # max lidar range
+            5.5,  #3.6,                # max lidar range
             sens.LidarBeamShape_RECTANGULAR,
             1,          # sample radius
             0,       # divergence angle
@@ -170,18 +220,6 @@ class ChronoEnv:
         self.vis.AddLightWithShadow(chrono.ChVector3d(2, 2, 2),  # point
                                     chrono.ChVector3d(0, 0, 0),  # aimpoint
                                     5,                       # radius (power)
-                                    1, 11,                     # near, far
-                                    55)                       # angle of FOV
-
-        self.vis.AddLightWithShadow(chrono.ChVector3d(-2, 1.25, 2),  # point
-                                    chrono.ChVector3d(0, 0, 0),  # aimpoint
-                                    3,                       # radius (power)
-                                    1, 11,                     # near, far
-                                    55)                       # angle of FOV
-
-        self.vis.AddLightWithShadow(chrono.ChVector3d(-2, -2, 2),  # point
-                                    chrono.ChVector3d(0, 0, 0),  # aimpoint
-                                    3,                       # radius (power)
                                     1, 11,                     # near, far
                                     55)                       # angle of FOV
 
@@ -231,7 +269,7 @@ class ChronoEnv:
             depth_data = torch.flip(depth_data, dims=[0, 1])
 
             MIN_DEPTH = 0
-            MAX_DEPTH = 5.5
+            MAX_DEPTH = 30 #5.5
             depth_data = np.clip(
                 (depth_data - MIN_DEPTH) / (MAX_DEPTH - MIN_DEPTH), 0, 1)
 
